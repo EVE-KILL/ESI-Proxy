@@ -78,7 +78,7 @@ class HttpServer
         $queryString = $request->get;
 
         // Generate a cache key
-        $cacheKey = md5($requestPath . json_encode($queryString));
+        $cacheKey = md5($requestPath . json_encode($queryString) . json_encode($authHeader));
 
         // Check the cache for a result and return it if found
         if ($result = $this->esiCache->get($cacheKey)) {
