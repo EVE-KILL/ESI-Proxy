@@ -15,6 +15,7 @@ class HttpServer
     protected Server $server;
     protected Table $esiStatus;
     protected Table $esiCache;
+    protected bool $isBanned = false;
 
     public function __construct(
         protected string $listen = '0.0.0.0',
@@ -41,10 +42,19 @@ class HttpServer
         $this->esiCache->column('expires', Table::TYPE_INT, 10);
         $this->esiCache->column('status', Table::TYPE_INT, 4);
         $this->esiCache->create();
+
+        // Check if we are banned
+        $this->isBanned = $this->isBanned();
     }
 
     protected function handleRequest(Request $request, Response $response): void
     {
+        if ($this->isBanned === true) {
+            $this->logger->log("We are banned from ESI, exiting");
+            $response->status(401);
+            $response->end('You are banned from ESI');
+            die();
+        }
         $this->logger->log("Request received: {$request->server['request_uri']}");
         $this->logger->log('Current ESI Error Limit: ' . $this->esiStatus->get('error', 'limit'));
         $this->logger->log('Current ESI Error Limit Reset: ' . $this->esiStatus->get('error', 'reset'));
@@ -92,6 +102,15 @@ class HttpServer
         $responseBody = curl_exec($curl);
         $responseInfo = curl_getinfo($curl);
 
+        // If the status code is a 401, we're banned and we might as well stop
+        if ($responseInfo['http_code'] === 401) {
+            $this->logger->log("We are banned from ESI, exiting");
+            touch('/tmp/esi.banned');
+            $response->status(401);
+            $response->end('You are banned from ESI');
+            return;
+        }
+
         // Get the error limit, and reset time from the headers
         $errorLimitRemaining = $responseInfo['http_x_esi_error_limit_remain'] ?? 100;
         $errorLimitReset = $responseInfo['http_x_esi_error_limit_reset'] ?? 60;
@@ -118,6 +137,15 @@ class HttpServer
             $response->header($key, $value);
         }
         $response->end($responseBody);
+    }
+
+    private function isBanned(): bool
+    {
+        $bannedFile = '/tmp/esi.banned';
+        if (file_exists($bannedFile)) {
+            return true;
+        }
+        return false;
     }
 
     public function run(): void
