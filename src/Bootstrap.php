@@ -149,6 +149,22 @@ class Bootstrap
             });
         }
 
-        $server->start();
+        $options = [
+            'host' => $options['host'],
+            'port' => $options['port'],
+            'daemonize' => false,
+            'worker_num' => 4,
+            'max_request' => 10000,
+            'dispatch_mode' => 2,
+            'backlog' => 128,
+            'reload_async' => true,
+            'max_wait_time' => 60,
+            'enable_coroutine' => true,
+            'http_compression' => true,
+            'http_compression_level' => 1,
+            'buffer_output_size' => 4 * 1024 * 1024
+        ];
+
+        $server->start($options);
     }
 }
