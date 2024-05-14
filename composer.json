@@ -18,8 +18,15 @@
         "php": "^8.2",
         "ext-apcu": "*",
         "ext-openswoole": "*",
+        "ext-mongodb": "*",
         "openswoole/core": "*",
-        "monolog/monolog": "*"
+        "monolog/monolog": "*",
+        "league/container": "*",
+        "mongodb/mongodb": "*",
+        "slim/slim": "*",
+        "slim/psr7": "*",
+        "symfony/console": "*",
+        "guzzlehttp/guzzle": "*"
     },
     "require-dev": {
         "openswoole/ide-helper": "*",
