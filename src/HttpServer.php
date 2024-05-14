@@ -2,7 +2,6 @@
 
 namespace EK;
 
-use finfo;
 use Monolog\Level;
 use OpenSwoole\Http\Request;
 use OpenSwoole\Http\Response;

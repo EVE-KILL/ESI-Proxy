@@ -17,10 +17,9 @@
     "require": {
         "php": "^8.2",
         "ext-apcu": "*",
-        "ext-fileinfo": "*",
         "ext-openswoole": "*",
         "openswoole/core": "*",
-        "monolog/monolog": "*",
+        "monolog/monolog": "*"
     },
     "require-dev": {
         "openswoole/ide-helper": "*",
