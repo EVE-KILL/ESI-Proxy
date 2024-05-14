@@ -75,16 +75,18 @@ class Bootstrap
             // Get the data from ESI
             $result = $esiFetcher->fetch($path, $clientIp, $query, $headers);
 
-            // Write it to the response
-            $response
-                ->withStatus($result['status'])
-                ->getBody()
-                ->write($result['body']);
-
             // Add all the headers from ESI to the response
             foreach ($result['headers'] as $header => $value) {
                 $response = $response->withHeader($header, $value);
             }
+
+            // Set the status code
+            $response = $response->withStatus($result['status']);
+
+            // Write it to the response
+            $response
+                ->getBody()
+                ->write($result['body']);
 
             return $response;
         });

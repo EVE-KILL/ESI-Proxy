@@ -53,7 +53,10 @@ class EsiFetch
 
         // If the cache key exists, return the cached response
         if ($this->cache->exists($cacheKey)) {
-            return $this->cache->get($cacheKey);
+            $result = $this->cache->get($cacheKey);
+            $result['status'] = 304;
+            $result['headers']['X-EK-Cache'] = 'HIT';
+            return $result;
         }
 
         // Make the request to the ESI API using a random proxy from $this->proxy->getRandom()
@@ -77,7 +80,7 @@ class EsiFetch
         if ($expires && in_array($statusCode, [200, 304])) {
             $this->cache->set($cacheKey, [
                 'status' => $statusCode,
-                'headers' => $response->getHeaders(),
+                'headers' => array_merge($response->getHeaders(), ['X-EK-Cache' => 'MISS']),
                 'body' => $contents
             ], $expiresInSeconds);
         }
@@ -96,7 +99,7 @@ class EsiFetch
         // Return the response as an array
        return [
            'status' => $statusCode,
-           'headers' => $response->getHeaders(),
+           'headers' => array_merge($response->getHeaders(), ['X-EK-Cache' => 'MISS']),
            'body' => $contents
        ];
     }
