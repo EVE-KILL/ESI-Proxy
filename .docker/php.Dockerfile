@@ -1,6 +1,6 @@
 FROM bitnami/minideb:latest
 
-LABEL org.opencontainers.image.source="https://github.com/EVE-KILL/EVE-KILL"
+LABEL org.opencontainers.image.source = "https://github.com/EVE-KILL/ESI-Proxy"
 
 # Run as root
 USER root
