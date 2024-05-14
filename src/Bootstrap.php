@@ -60,6 +60,11 @@ class Bootstrap
             return $response;
         });
 
+        $app->get('/status', function (Request $request, Response $response) {
+            $response->getBody()->write('OK');
+            return $response;
+        });
+
         // Catch-all route
         $app->get('/{routes:.+}', function (Request $request, Response $response) {
             $esiFetcher = $this->container->get(EsiFetch::class);
@@ -100,8 +105,16 @@ class Bootstrap
         });
 
         $server = new Server($host, $port);
-        $server->on('start', function ($server) use ($host, $port, $logger) {
+        $server->on('start', function ($server) use ($host, $port, $logger, $dialHome, $externalAddress) {
             $logger->log("Swoole http server is started at http://{$host}:{$port}");
+
+            if ($dialHome === true && $externalAddress !== '') {
+                $logger->log('Calling home');
+                /** @var DialHomeDevice $dialHomeDevice */
+                $dialHomeDevice = $this->container->get(DialHomeDevice::class);
+                $response = $dialHomeDevice->callHome($host, $port, $externalAddress);
+                $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
+            }
         });
 
         $server->handle(function ($request) use ($app, $logger) {
@@ -123,15 +136,12 @@ class Bootstrap
          * If it is false, we are working in standalone proxy mode
          */
         if ($dialHome === true && $externalAddress !== '') {
-            /** @var DialHomeDevice $dialHomeDevice */
-            $dialHomeDevice = $this->container->get(DialHomeDevice::class);
-            $logger->log('Calling home');
-            $response = $dialHomeDevice->callHome($host, $port, $externalAddress);
-            $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
             // Setup a tick to call home every hour
-            $server->tick(3600000, function () use ($logger, $dialHomeDevice, $host, $port, $externalAddress) {
+            $server->tick(3600000, function () use ($logger, $host, $port, $externalAddress) {
                 $logger->log('Calling home');
-                $dialHomeDevice->callHome($host, $port, $externalAddress);
+                /** @var DialHomeDevice $dialHomeDevice */
+                $dialHomeDevice = $this->container->get(DialHomeDevice::class);
+                $response = $dialHomeDevice->callHome($host, $port, $externalAddress);
                 $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
             });
         }
