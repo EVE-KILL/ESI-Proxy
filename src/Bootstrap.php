@@ -126,7 +126,6 @@ class Bootstrap
 
         // Setup a tick to clean the cache every minute
         $server->tick(60000, function () use ($logger) {
-            $logger->log('Cleaning cache');
             $this->container->get(Cache::class)->clean();
         });
 
