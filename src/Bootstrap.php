@@ -5,6 +5,7 @@ namespace EK;
 use Composer\Autoload\ClassLoader;
 use EK\Cache\Cache;
 use EK\EVE\EsiFetch;
+use EK\EVEKILL\DialHomeDevice;
 use EK\Logger\Logger;
 use EK\Proxy\Proxy;
 use League\Container\Container;
@@ -45,7 +46,7 @@ class Bootstrap
             ->setShared(true);
     }
 
-    public function run(string $host = '127.0.0.1', int $port = 9501): void
+    public function run(string $host = '127.0.0.1', int $port = 9501, string $externalAddress = '', bool $dialHome = false): void
     {
         // Start Slim
         $app = AppFactory::create();
@@ -67,7 +68,7 @@ class Bootstrap
             $path = $request->getUri()->getPath();
             $query = $request->getQueryParams();
             $headers = [
-                'User-Agent' => 'EVE-KILL ESI Proxy/1.0',
+                'User-Agent' => 'EVEKILL ESI Proxy/1.0',
                 'Accept' => 'application/json'
             ];
             $clientIp = $request->getServerParams()['remote_addr'];
@@ -108,6 +109,25 @@ class Bootstrap
             $logger->log('Cleaning cache');
             $this->container->get(Cache::class)->clean();
         });
+
+        /**
+         * If the dialHome flag is set to true, we will call home on startup, and once every hour
+         * This is done so that the EVE-KILL Proxy knows we're alive, and can be used for proxying requests
+         * If it is false, we are working in standalone proxy mode
+         */
+        if ($dialHome === true && $externalAddress !== '') {
+            /** @var DialHomeDevice $dialHomeDevice */
+            $dialHomeDevice = $this->container->get(DialHomeDevice::class);
+            $logger->log('Calling home');
+            $response = $dialHomeDevice->callHome($host, $port, $externalAddress);
+            $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
+            // Setup a tick to call home every hour
+            $server->tick(3600000, function () use ($logger, $dialHomeDevice, $host, $port, $externalAddress) {
+                $logger->log('Calling home');
+                $dialHomeDevice->callHome($host, $port, $externalAddress);
+                $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
+            });
+        }
 
         $server->start();
     }
