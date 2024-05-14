@@ -46,7 +46,7 @@ class Bootstrap
             ->setShared(true);
     }
 
-    public function run(string $host = '127.0.0.1', int $port = 9501, string $externalAddress = '', bool $dialHome = false): void
+    public function run(array $options = []): void
     {
         // Start Slim
         $app = AppFactory::create();
@@ -66,14 +66,14 @@ class Bootstrap
         });
 
         // Catch-all route
-        $app->get('/{routes:.+}', function (Request $request, Response $response) {
+        $app->get('/{routes:.+}', function (Request $request, Response $response) use ($options) {
             $esiFetcher = $this->container->get(EsiFetch::class);
 
             // We need to get the path, query, headers and client IP
             $path = $request->getUri()->getPath();
             $query = $request->getQueryParams();
             $headers = [
-                'User-Agent' => 'EVEKILL ESI Proxy/1.0',
+                'User-Agent' => $options['userAgent'],
                 'Accept' => 'application/json',
             ];
 
@@ -86,7 +86,7 @@ class Bootstrap
             $clientIp = $request->getServerParams()['remote_addr'];
 
             // Get the data from ESI
-            $result = $esiFetcher->fetch($path, $clientIp, $query, $headers);
+            $result = $esiFetcher->fetch($path, $clientIp, $query, $headers, $options);
 
             // Add all the headers from ESI to the response
             foreach ($result['headers'] as $header => $value) {
@@ -104,15 +104,15 @@ class Bootstrap
             return $response;
         });
 
-        $server = new Server($host, $port);
-        $server->on('start', function ($server) use ($host, $port, $logger, $dialHome, $externalAddress) {
-            $logger->log("Swoole http server is started at http://{$host}:{$port}");
+        $server = new Server($options['host'], $options['port']);
+        $server->on('start', function ($server) use ($logger, $options) {
+            $logger->log("Swoole http server is started at http://{$options['host']}:{$options['port']}");
 
-            if ($dialHome === true && $externalAddress !== '') {
+            if ($options['dialHome'] === true && $options['externalAddress'] !== '') {
                 $logger->log('Calling home');
                 /** @var DialHomeDevice $dialHomeDevice */
                 $dialHomeDevice = $this->container->get(DialHomeDevice::class);
-                $response = $dialHomeDevice->callHome($host, $port, $externalAddress);
+                $response = $dialHomeDevice->callHome($options['host'], $options['port'], $options['externalAddress']);
                 $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
             }
         });
@@ -138,13 +138,13 @@ class Bootstrap
          * This is done so that the EVE-KILL Proxy knows we're alive, and can be used for proxying requests
          * If it is false, we are working in standalone proxy mode
          */
-        if ($dialHome === true && $externalAddress !== '') {
+        if ($options['dialHome'] === true && $options['externalAddress'] !== '') {
             // Setup a tick to call home every hour
-            $server->tick(3600000, function () use ($logger, $host, $port, $externalAddress) {
+            $server->tick(3600000, function () use ($logger, $options) {
                 $logger->log('Calling home');
                 /** @var DialHomeDevice $dialHomeDevice */
                 $dialHomeDevice = $this->container->get(DialHomeDevice::class);
-                $response = $dialHomeDevice->callHome($host, $port, $externalAddress);
+                $response = $dialHomeDevice->callHome($options['host'], $options['port'], $options['externalAddress']);
                 $logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
             });
         }

@@ -15,16 +15,11 @@ class EsiFetch
         protected string $version = 'latest'
     ) {
         $this->client = new Client([
-            'base_uri' => $this->baseUri,
-            'request.options' => [
-                'headers' => [
-                    'User-Agent' => 'EVE-KILL ESI Proxy/1.0'
-                ]
-            ]
+            'base_uri' => $this->baseUri
         ]);
     }
 
-    public function fetch(string $path, string $clientIp, array $query = [], array $headers = []): array
+    public function fetch(string $path, string $clientIp, array $query = [], array $headers = [], array $options = []): array
     {
         // Ensure that one client isn't causing excessive errors
         if ($this->getErrorsByIP($clientIp) >= 5) {
@@ -54,7 +49,9 @@ class EsiFetch
         // If the cache key exists, return the cached response
         if ($this->cache->exists($cacheKey)) {
             $result = $this->cache->get($cacheKey);
-            $result['status'] = 304;
+            if (isset($options['skip304']) && $options['skip304'] === false) {
+                $result['status'] = 304;
+            }
             $result['headers']['X-EK-Cache'] = 'HIT';
             return $result;
         }
@@ -62,7 +59,9 @@ class EsiFetch
         // Make the request to the ESI API using a random proxy from $this->proxy->getRandom()
         $response = $this->client->request('GET', $path, [
             'query' => $query,
-            'headers' => $headers
+            'headers' => array_merge($headers, [
+                'User-Agent' => $options['userAgent']
+            ])
         ]);
 
         // Get the status code from the response

@@ -10,12 +10,7 @@ class DialHomeDevice
     public function __construct(
     ) {
        $this->client = new Client([
-           'base_uri' => '127.0.0.1:9201',
-           'request.options' => [
-               'headers' => [
-                   'User-Agent' => 'EVE-KILL ESI Proxy/1.0'
-               ]
-           ]
+           'base_uri' => '127.0.0.1:9201'
        ]);
     }
     public function callHome(string $host, int $port, string $externalAddress) {
