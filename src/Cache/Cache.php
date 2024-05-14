@@ -7,51 +7,49 @@ use OpenSwoole\Table;
 
 class Cache
 {
-    protected Table $cacheTable;
+    protected \PDO $sqlite;
     public function __construct(
         protected Logger $logger
     ) {
-        $this->cacheTable = new Table(1024);
-        $this->cacheTable->column('key', Table::TYPE_STRING, 64);
-        $this->cacheTable->column('value', Table::TYPE_STRING, 1024 * 1024);
-        $this->cacheTable->column('ttl', Table::TYPE_INT, 4);
-        $this->cacheTable->create();
+        // Use sqlite for the cache, and store it on disk in /data/cache.sqlite
+        $sqlitePath = dirname(__DIR__, 2) . '/data/cache.sqlite';
+        $this->sqlite = new \PDO('sqlite:' . $sqlitePath);
+
+        // Create the cache table
+        $this->sqlite->exec('CREATE TABLE IF NOT EXISTS cache (key STRING PRIMARY KEY, value TEXT, ttl INTEGER)');
     }
 
     public function clean(): void
     {
-        foreach ($this->cacheTable as $key => $value) {
-            // If the value has no TTL, skip it (we want to keep it _FOREVER_)
-            if ($value['ttl'] === 0) {
-                continue;
-            }
-
-            if ($value['ttl'] && $value['ttl'] < time()) {
-                $this->logger->log("Cleaning cache key: {$key}");
-                $this->cacheTable->del($key);
-            }
-        }
+        $this->sqlite->exec('DELETE FROM cache WHERE ttl > 0 AND ttl < ' . time());
     }
 
-    public function get(string $key): mixed
+    public function get(string $key): ?array
     {
-        $value = $this->cacheTable->get($key);
-        if ($value) {
-            return json_decode($value['value'], true);
+        $statement = $this->sqlite->prepare('SELECT value FROM cache WHERE key = :key');
+        $statement->execute([':key' => $key]);
+        $result = $statement->fetch(\PDO::FETCH_ASSOC);
+        if(isset($result['value'])) {
+            return json_decode($result['value'], true);
         }
+
         return null;
     }
 
     public function set(string $key, array $value, int $ttl = 0): bool
     {
-        return $this->cacheTable->set($key, [
-            'value' => json_encode($value),
-            'ttl' => $ttl ? time() + $ttl : 0
+        $statement = $this->sqlite->prepare('INSERT OR REPLACE INTO cache (key, value, ttl) VALUES (:key, :value, :ttl)');
+        return $statement->execute([
+            ':key' => $key,
+            ':value' => json_encode($value),
+            ':ttl' => $ttl > 0 ? time() + $ttl : 0
         ]);
     }
 
     public function exists(string $key): bool
     {
-        return $this->cacheTable->exists($key);
+        $statement = $this->sqlite->prepare('SELECT COUNT(*) FROM cache WHERE key = :key');
+        $statement->execute([':key' => $key]);
+        return $statement->fetchColumn() > 0;
     }
 }

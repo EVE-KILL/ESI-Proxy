@@ -74,7 +74,7 @@ class EsiFetch
         // Get the expires header from the response (The Expires and Date are in GMT)
         $expires = $response->getHeader('Expires')[0];
         $serverTime = $response->getHeader('Date')[0];
-        $expiresInSeconds = strtotime($expires) - strtotime($serverTime);
+        $expiresInSeconds = strtotime($expires) - strtotime($serverTime) ?? 60;
 
         // If the expires header is set, and the status code is 200, cache the response
         if ($expires && in_array($statusCode, [200, 304])) {
