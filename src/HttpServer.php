@@ -55,9 +55,19 @@ class HttpServer
             $response->end('You are banned from ESI');
             die();
         }
-        $this->logger->log("Request received: {$request->server['request_uri']}");
-        $this->logger->log('Current ESI Error Limit: ' . $this->esiStatus->get('error', 'limit'));
-        $this->logger->log('Current ESI Error Limit Reset: ' . $this->esiStatus->get('error', 'reset'));
+
+        // Get the request path
+        $requestPath = $request->server['request_uri'];
+
+        // Get the query string
+        $queryString = $request->get ?? [];
+
+        // Generate the full query
+        $builtQueryString = http_build_query($queryString);
+        $fullQuery = $requestPath . (!empty($builtQueryString) ? '?' . $builtQueryString : '');
+
+        // Log the request to the console
+        $this->logger->log("Request received: {$fullQuery}", ['limit' => $this->esiStatus->get('error', 'limit'), 'reset' => $this->esiStatus->get('error', 'reset')]);
 
         if ($this->esiStatus->get('error', 'limit') <= 0) {
             $response->status(420);
@@ -70,12 +80,6 @@ class HttpServer
         if (isset($request->header['authorization']) && !empty($request->header['authorization'])) {
             $authHeader = $request->header['authorization'];
         }
-
-        // Get the request path
-        $requestPath = $request->server['request_uri'];
-
-        // Get the query string
-        $queryString = $request->get;
 
         // Generate a cache key
         $cacheKey = md5($requestPath . json_encode($queryString) . json_encode($authHeader));
@@ -95,7 +99,7 @@ class HttpServer
 
         // Fetch the path from ESI
         $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, "{$esiUrl}{$requestPath}" . (!empty($queryString) ? '?' . http_build_query($queryString) : '') );
+        curl_setopt($curl, CURLOPT_URL, "{$esiUrl}{$requestPath}" . (!empty($builtQueryString) ? '?' . $builtQueryString : ''));
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($curl, CURLOPT_TIMEOUT, 10);
