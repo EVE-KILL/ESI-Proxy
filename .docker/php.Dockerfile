@@ -104,4 +104,4 @@ WORKDIR /app
 ARG PHP_VERSION="8.3"
 ENV PHP_VERSION=${PHP_VERSION}
 EXPOSE 9501
-CMD ["php", "/app/server.php"]
+ENTRYPOINT ["php", "/app/server.php"]
