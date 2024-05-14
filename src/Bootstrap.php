@@ -118,10 +118,14 @@ class Bootstrap
         });
 
         $server->handle(function ($request) use ($app, $logger) {
+            $response = $app->handle($request);
+
             $path = $request->getUri()->getPath();
             $requestParams = http_build_query($request->getQueryParams());
-            $logger->log("Request received: {$path}{$requestParams}");
-            return $app->handle($request);
+            $wasServedFromCache = $response->getHeader('X-EK-Cache')[0] === 'HIT';
+            $logger->log("Request received: {$path}{$requestParams}", ['served-from-cache' => $wasServedFromCache]);
+
+            return $response;
         });
 
         // Setup a tick to clean the cache every minute
