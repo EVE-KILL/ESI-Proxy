@@ -69,8 +69,15 @@ class Bootstrap
             $query = $request->getQueryParams();
             $headers = [
                 'User-Agent' => 'EVEKILL ESI Proxy/1.0',
-                'Accept' => 'application/json'
+                'Accept' => 'application/json',
             ];
+
+            // Add Authorization header if it exists
+            if ($request->hasHeader('Authorization')) {
+                $headers['Authorization'] = $request->getHeader('Authorization')[0];
+            }
+
+            // Get the client IP
             $clientIp = $request->getServerParams()['remote_addr'];
 
             // Get the data from ESI
