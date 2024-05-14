@@ -67,15 +67,18 @@ class HttpServer
 
         // Check if the request has an authorized header sent along
         $authHeader = [];
-        if ($request->header['authorization']) {
+        if (isset($request->header['authorization']) && !empty($request->header['authorization'])) {
             $authHeader = $request->header['authorization'];
         }
 
         // Get the request path
         $requestPath = $request->server['request_uri'];
 
+        // Get the query string
+        $queryString = $request->get;
+
         // Generate a cache key
-        $cacheKey = md5($requestPath);
+        $cacheKey = md5($requestPath . json_encode($queryString));
 
         // Check the cache for a result and return it if found
         if ($result = $this->esiCache->get($cacheKey)) {
@@ -92,7 +95,7 @@ class HttpServer
 
         // Fetch the path from ESI
         $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, "{$esiUrl}{$requestPath}");
+        curl_setopt($curl, CURLOPT_URL, "{$esiUrl}{$requestPath}" . (!empty($queryString) ? '?' . http_build_query($queryString) : '') );
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($curl, CURLOPT_TIMEOUT, 10);
