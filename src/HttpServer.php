@@ -65,6 +65,12 @@ class HttpServer
             return;
         }
 
+        // Check if the request has an authorized header sent along
+        $authHeader = [];
+        if ($request->header['authorization']) {
+            $authHeader = $request->header['authorization'];
+        }
+
         // Get the request path
         $requestPath = $request->server['request_uri'];
 
@@ -96,6 +102,9 @@ class HttpServer
         $headers[] = 'User-Agent: EK-ESI-Proxy @ michael@karbowiak.dk';
         $headers[] = 'Accept: application/json';
         $headers[] = 'Content-Type: application/json';
+        if (!empty($authHeader)) {
+            $headers[] = "Authorization: {$authHeader}";
+        }
 
         curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
 
