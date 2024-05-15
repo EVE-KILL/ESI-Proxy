@@ -51,6 +51,19 @@ class Endpoints
         // We need to get the path, query, headers and client IP
         $path = $request->getUri()->getPath();
         $query = $request->getQueryParams();
+
+        // Generate a semaphore key that locks the request till it's done
+        // To prevent multiple concurrent hitting the same url and not getting the cache
+        $semaphoreKey = md5($path . '?' . http_build_query($query));
+
+        // Create a temporary file with the semaphore key
+        $file = '/tmp/' . $semaphoreKey;
+        file_put_contents($file, '');
+
+        // Lock the semaphore
+        $semaphore = sem_get(ftok($file, 'a'));
+        sem_acquire($semaphore);
+
         $headers = [
             'User-Agent' => $this->userAgent,
             'Accept' => 'application/json',
@@ -62,7 +75,15 @@ class Endpoints
         }
 
         // Get the data from ESI
-        return $this->esiFetcher->fetch($path, $query, $headers);
+        $result = $this->esiFetcher->fetch($path, $query, $headers);
+
+        // Release the semaphore
+        sem_release($semaphore);
+
+        // Remove the semaphore file
+        unlink($file);
+
+        return $result;
     }
 
     public function handle(Request $request, Response $response, array $args): Response
@@ -75,7 +96,7 @@ class Endpoints
         }
 
         // Set the status code
-        $response = $response->withStatus($result['status']);
+        $response = $response->withStatus($result['status'] ?? 200);
 
         // Write it to the response
         $response

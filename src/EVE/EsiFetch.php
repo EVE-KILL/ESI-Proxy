@@ -77,7 +77,7 @@ class EsiFetch
         ]);
 
         // Get the status code from the response
-        $statusCode = $response->getStatusCode();
+        $statusCode = $response->getStatusCode() ?? 503;
 
         // Get the contents of the response
         $contents = $response->getBody()->getContents();

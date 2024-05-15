@@ -20,6 +20,7 @@
         "ext-openswoole": "*",
         "ext-mongodb": "*",
         "ext-redis": "*",
+        "ext-sysvsem": "*",
         "openswoole/core": "*",
         "monolog/monolog": "*",
         "league/container": "*",
