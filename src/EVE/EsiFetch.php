@@ -72,7 +72,8 @@ class EsiFetch
         // Make the request to the ESI API
         $response = $this->client->request('GET', $path, [
             'query' => $query,
-            'headers' => $headers
+            'headers' => $headers,
+            'http_errors' => false
         ]);
 
         // Get the status code from the response
@@ -82,12 +83,12 @@ class EsiFetch
         $contents = $response->getBody()->getContents();
 
         // Get the expires header from the response (The Expires and Date are in GMT)
-        $expires = $response->getHeader('Expires')[0];
-        $serverTime = $response->getHeader('Date')[0];
+        $expires = $response->getHeader('Expires')[0] ?? date('D, d M Y H:i:s T');
+        $serverTime = $response->getHeader('Date')[0] ?? date('D, d M Y H:i:s T');
         $expiresInSeconds = strtotime($expires) - strtotime($serverTime) ?? 60;
 
         // If the expires header is set, and the status code is 200, cache the response
-        if ($expires && in_array($statusCode, [200, 304])) {
+        if ($expiresInSeconds > 0 && in_array($statusCode, [200, 304])) {
             $this->cache->set($cacheKey, [
                 'status' => $statusCode,
                 'headers' => array_merge($response->getHeaders(), ['X-EK-Cache' => 'MISS']),
