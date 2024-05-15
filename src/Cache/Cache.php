@@ -28,6 +28,11 @@ class Cache
         ], [
             'prefix' => 'esi:',
             'persistent' => true,
+            'timeout' => 10,
+            'read_write_timeout' => 5,
+            'tcp_keepalive' => 1,
+            'tcp_nodelay' => true,
+            'throw_errors' => false,
         ]);
     }
 
