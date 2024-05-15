@@ -51,6 +51,7 @@ class Endpoints
         // We need to get the path, query, headers and client IP
         $path = $request->getUri()->getPath();
         $query = $request->getQueryParams();
+        ksort($query);
 
         $headers = [
             'User-Agent' => $this->userAgent,

@@ -30,7 +30,8 @@
         "symfony/console": "*",
         "guzzlehttp/guzzle": "*",
         "bandwidth-throttle/token-bucket": "*",
-        "kcs/class-finder": "*"
+        "kcs/class-finder": "*",
+        "predis/predis": "*"
     },
     "require-dev": {
         "openswoole/ide-helper": "*",

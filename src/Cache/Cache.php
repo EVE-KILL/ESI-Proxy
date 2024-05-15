@@ -4,10 +4,12 @@ namespace EK\Cache;
 
 use EK\Logger\Logger;
 use EK\Server\Server;
+use Predis\Client;
+use Predis\Response\Status;
 
 class Cache
 {
-    protected \Redis $redis;
+    protected Client $redis;
     public function __construct(
         protected Server $server,
         protected Logger $logger
@@ -17,12 +19,16 @@ class Cache
         $redisPassword = $this->server->getOptions()['redisPassword'];
         $redisDatabase = $this->server->getOptions()['redisDatabase'];
 
-        $this->redis = new \Redis();
-        $this->redis->pconnect($redisHost, $redisPort, 5, 'esi', 500, 5);
-        $this->redis->select($redisDatabase);
-        if ($redisPassword !== '') {
-            $this->redis->auth($redisPassword);
-        }
+        $this->redis = new Client([
+            'scheme' => 'tcp',
+            'host' => $redisHost,
+            'port' => $redisPort,
+            'password' => $redisPassword,
+            'database' => $redisDatabase,
+        ], [
+            'prefix' => 'esi:',
+            'persistent' => true,
+        ]);
     }
 
     public function clean(): void
@@ -32,10 +38,15 @@ class Cache
 
     public function get(string $key): mixed
     {
-        return json_decode($this->redis->get($key), true);
+        $result = $this->redis->get($key);
+        if ($result === null) {
+            return null;
+        }
+
+        return json_decode($result, true);
     }
 
-    public function set(string $key, mixed $value, int $ttl = 0): bool
+    public function set(string $key, mixed $value, int $ttl = 0): Status
     {
         if ($ttl > 0) {
             return $this->redis->setex($key, $ttl, json_encode($value));
