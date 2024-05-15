@@ -62,7 +62,7 @@ class Endpoints
 
         // Add Authorization header if it exists
         if ($request->hasHeader('Authorization') || $request->hasHeader('authorization')) {
-            $headers['authorization'] = $request->getHeader('Authorization')[0];
+            $headers['authorization'] = $request->getHeader('Authorization');
             dump("Adding authorization header", $headers);
         }
 
