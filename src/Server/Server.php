@@ -77,7 +77,7 @@ class Server
 
             $path = $request->getUri()->getPath();
             $requestParams = http_build_query($request->getQueryParams());
-            $wasServedFromCache = $response->getHeader('X-EK-Cache')[0] === 'HIT';
+            $wasServedFromCache = $response->getHeader('X-EK-Cache')[0] ?? '' === 'HIT';
             $this->logger->log("Request received: {$path}{$requestParams}", ['served-from-cache' => $wasServedFromCache]);
 
             return $response;
