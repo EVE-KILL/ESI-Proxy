@@ -136,7 +136,7 @@ class EsiFetch
 
     private function setEsiErrorLimit(int $limit, int $reset): void
     {
-        $this->cache->set('esi_error_limit', ['limit' => $limit, 'reset' => $reset], 0);
+        $this->cache->set('esi_error_limit', ['limit' => $limit, 'reset' => $reset], $reset);
     }
 
     private function areWeBannedYet(): bool

@@ -52,18 +52,6 @@ class Endpoints
         $path = $request->getUri()->getPath();
         $query = $request->getQueryParams();
 
-        // Generate a semaphore key that locks the request till it's done
-        // To prevent multiple concurrent hitting the same url and not getting the cache
-        $semaphoreKey = md5($path . '?' . http_build_query($query));
-
-        // Create a temporary file with the semaphore key
-        $file = '/tmp/' . $semaphoreKey;
-        file_put_contents($file, '');
-
-        // Lock the semaphore
-        $semaphore = sem_get(ftok($file, 'a'));
-        sem_acquire($semaphore);
-
         $headers = [
             'User-Agent' => $this->userAgent,
             'Accept' => 'application/json',
@@ -75,15 +63,7 @@ class Endpoints
         }
 
         // Get the data from ESI
-        $result = $this->esiFetcher->fetch($path, $query, $headers, [], $this->options('waitForEsiErrorReset', false));
-
-        // Release the semaphore
-        sem_release($semaphore);
-
-        // Remove the semaphore file
-        unlink($file);
-
-        return $result;
+        return $this->esiFetcher->fetch($path, $query, $headers, [], $this->options('waitForEsiErrorReset', false));
     }
 
     public function handle(Request $request, Response $response, array $args): Response
