@@ -2,8 +2,6 @@
 
 namespace EK\Server;
 
-use EK\Cache\Cache;
-use EK\EVE\EsiFetch;
 use EK\EVEKILL\DialHomeDevice;
 use EK\Logger\Logger;
 use Kcs\ClassFinder\Finder\ComposerFinder;

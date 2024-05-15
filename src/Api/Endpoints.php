@@ -64,7 +64,7 @@ class Endpoints
         }
 
         // Get the data from ESI
-        return $this->esiFetcher->fetch($path, $query, $headers, [], $this->options('waitForEsiErrorReset', false));
+        return $this->esiFetcher->fetch($path, $query, $headers, [], $this->options('waitForEsiErrorReset', false), $this->rateLimitBucket);
     }
 
     public function handle(Request $request, Response $response, array $args): Response

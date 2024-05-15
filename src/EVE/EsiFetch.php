@@ -14,29 +14,19 @@ use GuzzleHttp\Client;
 class EsiFetch
 {
     protected Client $client;
-    protected BlockingConsumer $rateLimitBucket;
 
     public function __construct(
         protected Cache $cache,
         protected Logger $logger,
-        protected int $rateLimit = 0,
         protected string $baseUri = 'https://esi.evetech.net',
         protected string $version = 'latest'
     ) {
         $this->client = new Client([
             'base_uri' => $this->baseUri
         ]);
-
-        if ($rateLimit > 0) {
-            $storage = new FileStorage('/tmp/esi_rate_limit.bucket');
-            $rate = new Rate($rateLimit, Rate::SECOND);
-            $bucket = new TokenBucket($rateLimit, $rate, $storage);
-            $bucket->bootstrap($rateLimit);
-            $this->rateLimitBucket = new BlockingConsumer($bucket);
-        }
     }
 
-    public function fetch(string $path, array $query = [], array $headers = [], array $options = [], bool $waitForEsiErrorReset = false): array
+    public function fetch(string $path, array $query = [], array $headers = [], array $options = [], bool $waitForEsiErrorReset = false, ?BlockingConsumer &$blockingConsumer = null): array
     {
         // Make sure we aren't banned
         if ($this->areWeBanned()) {
@@ -65,18 +55,24 @@ class EsiFetch
         $cacheKey = $this->getCacheKey($path, $query, $headers);
 
         // If the cache key exists, return the cached response
-        if ($this->cache->exists($cacheKey)) {
-            $result = $this->cache->get($cacheKey);
-            if (isset($options['skip304']) && $options['skip304'] === false) {
-                $result['status'] = 304;
-            }
-            $result['headers']['X-EK-Cache'] = 'HIT';
-            return $result;
-        }
+        //if ($this->cache->exists($cacheKey)) {
+        //    $result = $this->cache->get($cacheKey);
+        //    if (isset($options['skip304']) && $options['skip304'] === false) {
+        //        $result['status'] = 304;
+        //    }
+        //    $result['headers']['X-EK-Cache'] = 'HIT';
+        //    return $result;
+        //}
 
         // Consume a token from the rate limit bucket if we have a rate limit
-        if ($this->rateLimit > 0) {
-            $this->rateLimitBucket->consume(1);
+        if ($blockingConsumer !== null) {
+            try {
+                $blockingConsumer->consume(1);
+            } catch (\Exception $e) {
+                // Wait 50ms and try again
+                usleep(50000);
+                $blockingConsumer->consume(1);
+            }
         }
 
         // Make the request to the ESI API
