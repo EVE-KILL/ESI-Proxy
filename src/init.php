@@ -1,4 +1,5 @@
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED);
 
 $autoloaderPath = dirname(__DIR__, 1) . '/vendor/autoload.php';
 if (!file_exists($autoloaderPath)) {
