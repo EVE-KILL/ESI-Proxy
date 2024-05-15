@@ -85,8 +85,8 @@ class EsiFetch
         // Get the status code from the response
         $statusCode = $response->getStatusCode() ?? 503;
 
-        // If the status code is 401, we are banned
-        if ($statusCode === 401) {
+        // If the status code is 401, we are banned (It also needs to have the message, otherwise it's not official - or something)
+        if ($statusCode === 401 && str_contains($response->getBody()->getContents(), 'You have been banned from using ESI.')) {
             $this->cache->set('esi_banned', true, 0);
         }
 
