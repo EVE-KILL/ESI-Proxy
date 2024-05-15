@@ -39,7 +39,7 @@ class EsiFetch
     public function fetch(string $path, array $query = [], array $headers = [], array $options = [], bool $waitForEsiErrorReset = false): array
     {
         // Make sure we aren't banned
-        if ($this->areWeBannedYet()) {
+        if ($this->areWeBanned()) {
             return [
                 'status' => 401,
                 'headers' => [],
@@ -88,6 +88,11 @@ class EsiFetch
 
         // Get the status code from the response
         $statusCode = $response->getStatusCode() ?? 503;
+
+        // If the status code is 401, we are banned
+        if ($statusCode === 401) {
+            $this->cache->set('esi_banned', true, 0);
+        }
 
         // Get the contents of the response
         $contents = $response->getBody()->getContents();
@@ -139,7 +144,7 @@ class EsiFetch
         $this->cache->set('esi_error_limit', ['limit' => $limit, 'reset' => $reset], $reset);
     }
 
-    private function areWeBannedYet(): bool
+    private function areWeBanned(): bool
     {
         return $this->cache->exists('esi_banned');
     }
