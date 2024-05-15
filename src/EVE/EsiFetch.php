@@ -39,7 +39,9 @@ class EsiFetch
         // Make sure we aren't banned
         if ($this->areWeBannedYet()) {
             return [
-                'error' => 'You are banned from ESI'
+                'status' => 401,
+                'headers' => [],
+                'body' => ['error' => 'You are banned from ESI']
             ];
         }
 
@@ -47,7 +49,11 @@ class EsiFetch
         $esiErrorLimit = $this->getEsiErrorLimit();
         if ($esiErrorLimit['limit'] <= 0) {
             return [
-                'error' => 'Error limit reached, please try again in ' . $esiErrorLimit['reset'] . ' seconds'
+                'status' => 420,
+                'headers' => [],
+                'body' => [
+                    'error' => 'Error limit reached, please try again in ' . $esiErrorLimit['reset'] . ' seconds'
+                ]
             ];
         }
 
