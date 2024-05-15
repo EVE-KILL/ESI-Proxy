@@ -48,12 +48,14 @@ class Endpoints
         }
     }
 
-    public function fetch(Request $request, Response $response, array $args): array
+    public function fetch(Request $request, Response $response): array
     {
         // We need to get the path, query, headers and client IP
         $path = $request->getUri()->getPath();
         $query = $request->getQueryParams();
         ksort($query);
+        $requestMethod = $request->getMethod();
+        $requestBody = $request->getBody()->getContents();
 
         $headers = [
             'User-Agent' => $this->userAgent,
@@ -63,16 +65,15 @@ class Endpoints
         // Add Authorization header if it exists
         if ($request->hasHeader('Authorization') || $request->hasHeader('authorization')) {
             $headers['authorization'] = $request->getHeader('Authorization');
-            dump("Adding authorization header", $headers);
         }
 
         // Get the data from ESI
-        return $this->esiFetcher->fetch($path, $query, $headers, [], $this->options('waitForEsiErrorReset', false), $this->rateLimitBucket);
+        return $this->esiFetcher->fetch($path, $query, $requestBody, $headers, [], $this->options('waitForEsiErrorReset', false), $this->rateLimitBucket, $requestMethod);
     }
 
-    public function handle(Request $request, Response $response, array $args): Response
+    public function handle(Request $request, Response $response): Response
     {
-        $result = $this->fetch($request, $response, $args);
+        $result = $this->fetch($request, $response);
 
         // Add all the headers from ESI to the response
         foreach ($result['headers'] as $header => $value) {

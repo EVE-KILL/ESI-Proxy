@@ -26,7 +26,7 @@ class EsiFetch
         ]);
     }
 
-    public function fetch(string $path, array $query = [], array $headers = [], array $options = [], bool $waitForEsiErrorReset = false, ?BlockingConsumer &$blockingConsumer = null): array
+    public function fetch(string $path, array $query = [], string $requestBody = '', array $headers = [], array $options = [], bool $waitForEsiErrorReset = false, ?BlockingConsumer &$blockingConsumer = null, string $requestMethod = 'GET'): array
     {
         // Make sure we aren't banned
         if ($this->areWeBanned()) {
@@ -76,19 +76,19 @@ class EsiFetch
         }
 
         // Make the request to the ESI API
-        dump("Request to ESI", $path, $query, $headers);
-        $response = $this->client->request('GET', $path, [
+        $response = $this->client->request($requestMethod, $path, [
             'query' => $query,
             'headers' => $headers,
+            'body' => $requestBody,
             'http_errors' => false
         ]);
 
+;
         // Get the status code from the response
         $statusCode = $response->getStatusCode() ?? 503;
 
         // Get the contents of the response
         $contents = $response->getBody()->getContents();
-        dump($contents);
 
         // If the status code is 401, we are banned (It also needs to have the message, otherwise it's not official - or something)
         if ($statusCode === 401 && str_contains($contents, 'You have been banned from using ESI.')) {
@@ -96,8 +96,9 @@ class EsiFetch
         }
 
         // Get the expires header from the response (The Expires and Date are in GMT)
-        $expires = $response->getHeader('Expires')[0] ?? date('D, d M Y H:i:s T');
-        $serverTime = $response->getHeader('Date')[0] ?? date('D, d M Y H:i:s T');
+        $now = new \DateTime('now', new \DateTimeZone('GMT'));
+        $expires = $response->getHeader('Expires')[0] ?? $now->format('D, d M Y H:i:s T');
+        $serverTime = $response->getHeader('Date')[0] ?? $now->format('D, d M Y H:i:s T');
         $expiresInSeconds = strtotime($expires) - strtotime($serverTime) ?? 60;
 
         // If the expires header is set, and the status code is 200, cache the response

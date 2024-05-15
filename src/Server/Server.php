@@ -53,7 +53,7 @@ class Server
         foreach($sortedEndpoints as $endpoint) {
             foreach($endpoint->routes as $route => $methods) {
                 $app->map($methods, $route, function (Request $request, Response $response, array $args) use ($endpoint) {
-                    return $endpoint->handle($request, $response, $args);
+                    return $endpoint->handle($request, $response);
                 });
             }
         }
