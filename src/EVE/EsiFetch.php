@@ -43,7 +43,7 @@ class EsiFetch
             return [
                 'status' => 401,
                 'headers' => [],
-                'body' => ['error' => 'You are banned from ESI']
+                'body' => 'You are banned from ESI'
             ];
         }
 
@@ -53,9 +53,7 @@ class EsiFetch
             return [
                 'status' => 420,
                 'headers' => [],
-                'body' => [
-                    'error' => 'Error limit reached, please try again in ' . $esiErrorLimit['reset'] . ' seconds'
-                ]
+                'body' => 'Error limit reached, please try again in ' . $esiErrorLimit['reset'] . ' seconds'
             ];
         } else if ($waitForEsiErrorReset === true && $esiErrorLimit['limit'] <= 0) {
             // We should just sleep until the next reset
