@@ -18,7 +18,7 @@ class Cache
         $redisDatabase = $this->server->getOptions()['redisDatabase'];
 
         $this->redis = new \Redis();
-        $this->redis->connect($redisHost, $redisPort);
+        $this->redis->pconnect($redisHost, $redisPort, 5, 'esi', 500, 5);
         $this->redis->select($redisDatabase);
         if ($redisPassword !== '') {
             $this->redis->auth($redisPassword);
