@@ -83,18 +83,17 @@ class EsiFetch
             'http_errors' => false
         ]);
 
-        dump("Response from ESI", $response->getBody()->getContents());
-
         // Get the status code from the response
         $statusCode = $response->getStatusCode() ?? 503;
 
-        // If the status code is 401, we are banned (It also needs to have the message, otherwise it's not official - or something)
-        if ($statusCode === 401 && str_contains($response->getBody()->getContents(), 'You have been banned from using ESI.')) {
-            $this->cache->set('esi_banned', true, 0);
-        }
-
         // Get the contents of the response
         $contents = $response->getBody()->getContents();
+        dump($contents);
+
+        // If the status code is 401, we are banned (It also needs to have the message, otherwise it's not official - or something)
+        if ($statusCode === 401 && str_contains($contents, 'You have been banned from using ESI.')) {
+            $this->cache->set('esi_banned', true, 0);
+        }
 
         // Get the expires header from the response (The Expires and Date are in GMT)
         $expires = $response->getHeader('Expires')[0] ?? date('D, d M Y H:i:s T');
