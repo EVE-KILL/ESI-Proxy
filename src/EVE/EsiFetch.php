@@ -55,14 +55,14 @@ class EsiFetch
         $cacheKey = $this->getCacheKey($path, $query, $headers);
 
         // If the cache key exists, return the cached response
-        //if ($this->cache->exists($cacheKey)) {
-        //    $result = $this->cache->get($cacheKey);
-        //    if (isset($options['skip304']) && $options['skip304'] === false) {
-        //        $result['status'] = 304;
-        //    }
-        //    $result['headers']['X-EK-Cache'] = 'HIT';
-        //    return $result;
-        //}
+        if ($this->cache->exists($cacheKey)) {
+            $result = $this->cache->get($cacheKey);
+            if (isset($options['skip304']) && $options['skip304'] === false) {
+                $result['status'] = 304;
+            }
+            $result['headers']['X-EK-Cache'] = 'HIT';
+            return $result;
+        }
 
         // Consume a token from the rate limit bucket if we have a rate limit
         if ($blockingConsumer !== null) {
