@@ -7,6 +7,7 @@ use bandwidthThrottle\tokenBucket\Rate;
 use bandwidthThrottle\tokenBucket\storage\FileStorage;
 use bandwidthThrottle\tokenBucket\TokenBucket;
 use EK\Cache\Cache;
+use EK\Logger\Logger;
 use EK\Proxy\Proxy;
 use GuzzleHttp\Client;
 
@@ -17,6 +18,7 @@ class EsiFetch
 
     public function __construct(
         protected Cache $cache,
+        protected Logger $logger,
         protected int $rateLimit = 0,
         protected string $baseUri = 'https://esi.evetech.net',
         protected string $version = 'latest'
@@ -34,7 +36,7 @@ class EsiFetch
         }
     }
 
-    public function fetch(string $path, array $query = [], array $headers = [], array $options = []): array
+    public function fetch(string $path, array $query = [], array $headers = [], array $options = [], bool $waitForEsiErrorReset = false): array
     {
         // Make sure we aren't banned
         if ($this->areWeBannedYet()) {
@@ -47,7 +49,7 @@ class EsiFetch
 
         // Make sure that we aren't against any error limits
         $esiErrorLimit = $this->getEsiErrorLimit();
-        if ($esiErrorLimit['limit'] <= 0) {
+        if ($esiErrorLimit['limit'] <= 0 && $waitForEsiErrorReset === false) {
             return [
                 'status' => 420,
                 'headers' => [],
@@ -55,6 +57,10 @@ class EsiFetch
                     'error' => 'Error limit reached, please try again in ' . $esiErrorLimit['reset'] . ' seconds'
                 ]
             ];
+        } else if ($waitForEsiErrorReset === true && $esiErrorLimit['limit'] <= 0) {
+            // We should just sleep until the next reset
+            $this->logger->log('Sleeping for ' . $esiErrorLimit['reset'] . ' seconds');
+            sleep($esiErrorLimit['reset']);
         }
 
         // Get the cache key for this request

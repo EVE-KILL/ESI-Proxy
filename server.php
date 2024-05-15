@@ -13,6 +13,7 @@ $cliApplication->register('server')
     ->addOption('user-agent', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The user agent to use', 'EVE-KILL ESI Proxy/1.0')
     ->addOption('skip304', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Skip 304 responses')
     ->addOption('rate-limit', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The rate limit to use', 500)
+    ->addOption('wait-for-esi-error-reset', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Wait for ESI error reset')
     // Redis
     ->addOption('redis-host', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis host to use', '127.0.0.1')
     ->addOption('redis-port', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis port to use', 6379)
@@ -33,6 +34,7 @@ $cliApplication->register('server')
             'userAgent' => $input->getOption('user-agent'),
             'skip304' => $input->getOption('skip304'),
             'rateLimit' => $input->getOption('rate-limit'),
+            'waitForEsiErrorReset' => $input->getOption('wait-for-esi-error-reset'),
             // Redis
             'redisHost' => $input->getOption('redis-host'),
             'redisPort' => $input->getOption('redis-port'),

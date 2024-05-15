@@ -75,7 +75,7 @@ class Endpoints
         }
 
         // Get the data from ESI
-        $result = $this->esiFetcher->fetch($path, $query, $headers);
+        $result = $this->esiFetcher->fetch($path, $query, $headers, [], $this->options('waitForEsiErrorReset', false));
 
         // Release the semaphore
         sem_release($semaphore);
