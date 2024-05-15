@@ -76,11 +76,14 @@ class EsiFetch
         }
 
         // Make the request to the ESI API
+        dump("Request to ESI", $path, $query, $headers);
         $response = $this->client->request('GET', $path, [
             'query' => $query,
             'headers' => $headers,
             'http_errors' => false
         ]);
+
+        dump("Response from ESI", $response->getBody()->getContents());
 
         // Get the status code from the response
         $statusCode = $response->getStatusCode() ?? 503;

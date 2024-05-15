@@ -61,8 +61,9 @@ class Endpoints
         ];
 
         // Add Authorization header if it exists
-        if ($request->hasHeader('Authorization')) {
-            $headers['Authorization'] = $request->getHeader('Authorization')[0];
+        if ($request->hasHeader('Authorization') || $request->hasHeader('authorization')) {
+            $headers['authorization'] = $request->getHeader('Authorization')[0];
+            dump("Adding authorization header", $headers);
         }
 
         // Get the data from ESI
