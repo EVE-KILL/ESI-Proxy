@@ -72,9 +72,7 @@ class EsiFetch
         // Make the request to the ESI API
         $response = $this->client->request('GET', $path, [
             'query' => $query,
-            'headers' => array_merge($headers, [
-                'User-Agent' => $options['userAgent']
-            ])
+            'headers' => $headers
         ]);
 
         // Get the status code from the response

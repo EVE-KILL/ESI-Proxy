@@ -1,7 +1,7 @@
 <?php
 
 /** @var \EK\Bootstrap $server */
-$server = require_once __DIR__ . '/src/init.php';
+$bootstrap = require_once __DIR__ . '/src/init.php';
 
 $cliApplication = new \Symfony\Component\Console\Application();
 $cliApplication->register('server')
@@ -12,8 +12,11 @@ $cliApplication->register('server')
     ->addOption('dial-home', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Dial home')
     ->addOption('user-agent', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The user agent to use', 'EVE-KILL ESI Proxy/1.0')
     ->addOption('skip304', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Skip 304 responses')
-    ->addOption('rate-limit', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The rate limit to use (0 to disable)', '0')
-    ->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($server) {
+    ->addOption('rate-limit', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The rate limit to use', 500)
+    ->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($bootstrap) {
+
+        $container = $bootstrap->getContainer();
+        $server = $container->get(\EK\Server\Server::class);
 
         $options = [
             'host' => $input->getOption('host'),
@@ -25,7 +28,8 @@ $cliApplication->register('server')
             'rateLimit' => $input->getOption('rate-limit'),
         ];
 
-        $server->run($options);
+        $server->setOptions($options);
+        $server->run();
     });
 
 $cliApplication->setDefaultCommand('server', true);

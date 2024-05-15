@@ -27,7 +27,8 @@
         "slim/psr7": "*",
         "symfony/console": "*",
         "guzzlehttp/guzzle": "*",
-        "bandwidth-throttle/token-bucket": "*"
+        "bandwidth-throttle/token-bucket": "*",
+        "kcs/class-finder": "*"
     },
     "require-dev": {
         "openswoole/ide-helper": "*",
