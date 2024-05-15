@@ -38,7 +38,9 @@ class Endpoints
             $this->logger->log(get_class($this) . ' rate limit is enabled and set to ' . $this->rateLimit);
 
             // Create the rate limit bucket
-            $storage = new FileStorage('/tmp/' . get_class($this) . '_rate_limit.bucket');
+            $className = str_replace('\\', '_', get_class($this));
+            $bucketPath = '/tmp/' . $className . '_rate_limit.bucket';
+            $storage = new FileStorage($bucketPath);
             $rate = new Rate($this->rateLimit, Rate::SECOND);
             $bucket = new TokenBucket($this->rateLimit, $rate, $storage);
             $bucket->bootstrap($this->rateLimit);
