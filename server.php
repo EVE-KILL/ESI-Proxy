@@ -13,6 +13,11 @@ $cliApplication->register('server')
     ->addOption('user-agent', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The user agent to use', 'EVE-KILL ESI Proxy/1.0')
     ->addOption('skip304', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Skip 304 responses')
     ->addOption('rate-limit', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The rate limit to use', 500)
+    // Redis
+    ->addOption('redis-host', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis host to use', '127.0.0.1')
+    ->addOption('redis-port', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis port to use', 6379)
+    ->addOption('redis-password', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis password to use', '')
+    ->addOption('redis-database', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis database to use', 0)
     ->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($bootstrap) {
 
         $container = $bootstrap->getContainer();
@@ -26,6 +31,11 @@ $cliApplication->register('server')
             'userAgent' => $input->getOption('user-agent'),
             'skip304' => $input->getOption('skip304'),
             'rateLimit' => $input->getOption('rate-limit'),
+            // Redis
+            'redisHost' => $input->getOption('redis-host'),
+            'redisPort' => $input->getOption('redis-port'),
+            'redisPassword' => $input->getOption('redis-password'),
+            'redisDatabase' => $input->getOption('redis-database')
         ];
 
         $server->setOptions($options);

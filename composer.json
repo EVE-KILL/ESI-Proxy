@@ -19,6 +19,7 @@
         "ext-apcu": "*",
         "ext-openswoole": "*",
         "ext-mongodb": "*",
+        "ext-redis": "*",
         "openswoole/core": "*",
         "monolog/monolog": "*",
         "league/container": "*",

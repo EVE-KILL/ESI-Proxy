@@ -4,6 +4,8 @@ namespace EK;
 
 use Composer\Autoload\ClassLoader;
 use EK\Cache\Cache;
+use EK\Logger\Logger;
+use EK\Server\Server;
 use League\Container\Container;
 use League\Container\ReflectionContainer;
 

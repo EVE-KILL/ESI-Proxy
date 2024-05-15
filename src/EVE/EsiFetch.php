@@ -116,7 +116,11 @@ class EsiFetch
 
     private function getEsiErrorLimit(): array
     {
-        return $this->cache->get('esi_error_limit') ?? ['limit' => 100, 'reset' => 60];
+        $result = $this->cache->get('esi_error_limit');
+        if (!$result) {
+            return ['limit' => 100, 'reset' => 60];
+        }
+        return $result;
     }
 
     private function setEsiErrorLimit(int $limit, int $reset): void
