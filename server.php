@@ -18,6 +18,8 @@ $cliApplication->register('server')
     ->addOption('redis-port', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis port to use', 6379)
     ->addOption('redis-password', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis password to use', '')
     ->addOption('redis-database', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The Redis database to use', 0)
+    // Server
+    ->addOption('workers', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The number of workers to use', 4)
     ->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($bootstrap) {
 
         $container = $bootstrap->getContainer();
@@ -35,7 +37,9 @@ $cliApplication->register('server')
             'redisHost' => $input->getOption('redis-host'),
             'redisPort' => $input->getOption('redis-port'),
             'redisPassword' => $input->getOption('redis-password'),
-            'redisDatabase' => $input->getOption('redis-database')
+            'redisDatabase' => $input->getOption('redis-database'),
+            // Server
+            'workers' => $input->getOption('workers')
         ];
 
         $server->setOptions($options);

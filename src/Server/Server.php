@@ -101,7 +101,7 @@ class Server
 
         $server->set([
             'daemonize' => false,
-            'worker_num' => 4,
+            'worker_num' => $this->getOptions()['workers'] ?? 4,
             'max_request' => 10000,
             'dispatch_mode' => 2,
             'backlog' => 128,
