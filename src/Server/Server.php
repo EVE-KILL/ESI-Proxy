@@ -83,11 +83,6 @@ class Server
             return $response;
         });
 
-        // Setup a tick to clean the cache every minute
-        $server->tick(60000, function () {
-            $this->container->get(Cache::class)->clean();
-        });
-
         /**
          * If the dialHome flag is set to true, we will call home on startup, and once every hour
          * This is done so that the EVE-KILL Proxy knows we're alive, and can be used for proxying requests
