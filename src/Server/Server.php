@@ -3,6 +3,7 @@
 namespace EK\Server;
 
 use EK\Cache\Cache;
+use EK\EVE\EsiFetch;
 use EK\EVEKILL\DialHomeDevice;
 use EK\Logger\Logger;
 use Kcs\ClassFinder\Finder\ComposerFinder;
@@ -27,13 +28,13 @@ class Server
         $app = AppFactory::create();
 
         $app->get('/', function (Request $request, Response $response) {
-            $response->getBody()->write('Please refer to https://esi.evetech.net/ui/ for the ESI documentation');
+            $response->getBody()->write(file_get_contents(__DIR__ . '/templates/index.html'));
             return $response;
         });
 
         $app->get('/status', function (Request $request, Response $response) {
-            $response->getBody()->write('OK');
-            return $response;
+            $response->getBody()->write(json_encode(['status' => 'OK']));
+            return $response->withHeader('Content-Type', 'application/json');
         });
 
         // Load all the endpoints
