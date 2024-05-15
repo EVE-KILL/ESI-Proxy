@@ -149,9 +149,7 @@ class Bootstrap
             });
         }
 
-        $options = [
-            'host' => $options['host'],
-            'port' => $options['port'],
+        $server->set([
             'daemonize' => false,
             'worker_num' => 4,
             'max_request' => 10000,
@@ -163,8 +161,8 @@ class Bootstrap
             'http_compression' => true,
             'http_compression_level' => 1,
             'buffer_output_size' => 4 * 1024 * 1024
-        ];
+        ]);
 
-        $server->start($options);
+        $server->start();
     }
 }
