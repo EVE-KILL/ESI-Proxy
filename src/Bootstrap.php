@@ -48,6 +48,9 @@ class Bootstrap
 
     public function run(array $options = []): void
     {
+        // Setup the ESI Fetcher
+        $esiFetcher = new EsiFetch($this->container->get(Cache::class), $options['rateLimit']);
+
         // Start Slim
         $app = AppFactory::create();
 
@@ -66,9 +69,7 @@ class Bootstrap
         });
 
         // Catch-all route
-        $app->get('/{routes:.+}', function (Request $request, Response $response) use ($options) {
-            $esiFetcher = $this->container->get(EsiFetch::class);
-
+        $app->get('/{routes:.+}', function (Request $request, Response $response) use ($options, $esiFetcher) {
             // We need to get the path, query, headers and client IP
             $path = $request->getUri()->getPath();
             $query = $request->getQueryParams();
@@ -82,11 +83,8 @@ class Bootstrap
                 $headers['Authorization'] = $request->getHeader('Authorization')[0];
             }
 
-            // Get the client IP
-            $clientIp = $request->getServerParams()['remote_addr'];
-
             // Get the data from ESI
-            $result = $esiFetcher->fetch($path, $clientIp, $query, $headers, $options);
+            $result = $esiFetcher->fetch($path, $query, $headers, $options);
 
             // Add all the headers from ESI to the response
             foreach ($result['headers'] as $header => $value) {

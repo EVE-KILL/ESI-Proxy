@@ -2,6 +2,10 @@
 
 namespace EK\EVE;
 
+use bandwidthThrottle\tokenBucket\BlockingConsumer;
+use bandwidthThrottle\tokenBucket\Rate;
+use bandwidthThrottle\tokenBucket\storage\FileStorage;
+use bandwidthThrottle\tokenBucket\TokenBucket;
 use EK\Cache\Cache;
 use EK\Proxy\Proxy;
 use GuzzleHttp\Client;
@@ -9,25 +13,29 @@ use GuzzleHttp\Client;
 class EsiFetch
 {
     protected Client $client;
+    protected BlockingConsumer $rateLimitBucket;
+
     public function __construct(
         protected Cache $cache,
+        protected int $rateLimit = 0,
         protected string $baseUri = 'https://esi.evetech.net',
         protected string $version = 'latest'
     ) {
         $this->client = new Client([
             'base_uri' => $this->baseUri
         ]);
+
+        if ($rateLimit > 0) {
+            $storage = new FileStorage('/tmp/esi_rate_limit.bucket');
+            $rate = new Rate($rateLimit, Rate::SECOND);
+            $bucket = new TokenBucket($rateLimit, $rate, $storage);
+            $bucket->bootstrap($rateLimit);
+            $this->rateLimitBucket = new BlockingConsumer($bucket);
+        }
     }
 
-    public function fetch(string $path, string $clientIp, array $query = [], array $headers = [], array $options = []): array
+    public function fetch(string $path, array $query = [], array $headers = [], array $options = []): array
     {
-        // Ensure that one client isn't causing excessive errors
-        if ($this->getErrorsByIP($clientIp) >= 5) {
-            return [
-                'error' => 'You have exceeded the error limit, please try again in a minute'
-            ];
-        }
-
         // Make sure we aren't banned
         if ($this->areWeBannedYet()) {
             return [
@@ -56,7 +64,12 @@ class EsiFetch
             return $result;
         }
 
-        // Make the request to the ESI API using a random proxy from $this->proxy->getRandom()
+        // Consume a token from the rate limit bucket if we have a rate limit
+        if ($this->rateLimit > 0) {
+            $this->rateLimitBucket->consume(1);
+        }
+
+        // Make the request to the ESI API
         $response = $this->client->request('GET', $path, [
             'query' => $query,
             'headers' => array_merge($headers, [
@@ -90,11 +103,6 @@ class EsiFetch
             $response->getHeader('X-Esi-Error-Limit-Reset')[0] ?? $esiErrorLimit['reset']
         );
 
-        // If we get an error status code, increment the error count for this IP
-        if (!in_array($statusCode, [200, 304, 404])) {
-            $this->incrementErrorsByIP($clientIp);
-        }
-
         // Return the response as an array
        return [
            'status' => $statusCode,
@@ -121,16 +129,5 @@ class EsiFetch
     private function areWeBannedYet(): bool
     {
         return $this->cache->exists('esi_banned');
-    }
-
-    private function getErrorsByIP(string $clientIp): int
-    {
-        return $this->cache->get('esi_errors_' . $clientIp) ?? 0;
-    }
-
-    private function incrementErrorsByIP(string $clientIp): void
-    {
-        $errors = $this->getErrorsByIP($clientIp);
-        $this->cache->set('esi_errors_' . $clientIp, $errors + 1, 60);
     }
 }

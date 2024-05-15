@@ -12,6 +12,7 @@ $cliApplication->register('server')
     ->addOption('dial-home', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Dial home')
     ->addOption('user-agent', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The user agent to use', 'EVE-KILL ESI Proxy/1.0')
     ->addOption('skip304', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Skip 304 responses')
+    ->addOption('rate-limit', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The rate limit to use (0 to disable)', '0')
     ->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($server) {
 
         $options = [
@@ -21,6 +22,7 @@ $cliApplication->register('server')
             'dialHome' => $input->getOption('dial-home'),
             'userAgent' => $input->getOption('user-agent'),
             'skip304' => $input->getOption('skip304'),
+            'rateLimit' => $input->getOption('rate-limit'),
         ];
 
         $server->run($options);

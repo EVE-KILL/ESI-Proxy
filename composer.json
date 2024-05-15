@@ -26,7 +26,8 @@
         "slim/slim": "*",
         "slim/psr7": "*",
         "symfony/console": "*",
-        "guzzlehttp/guzzle": "*"
+        "guzzlehttp/guzzle": "*",
+        "bandwidth-throttle/token-bucket": "*"
     },
     "require-dev": {
         "openswoole/ide-helper": "*",
