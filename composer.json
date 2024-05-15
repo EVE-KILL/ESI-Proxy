@@ -15,12 +15,9 @@
         }
     },
     "require": {
-        "php": "^8.2",
-        "ext-apcu": "*",
+        "php": "^8.3",
         "ext-openswoole": "*",
-        "ext-mongodb": "*",
         "ext-redis": "*",
-        "ext-sysvsem": "*",
         "openswoole/core": "*",
         "monolog/monolog": "*",
         "league/container": "*",
