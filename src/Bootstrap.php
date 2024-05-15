@@ -3,9 +3,6 @@
 namespace EK;
 
 use Composer\Autoload\ClassLoader;
-use EK\Cache\Cache;
-use EK\Logger\Logger;
-use EK\Server\Server;
 use League\Container\Container;
 use League\Container\ReflectionContainer;
 
@@ -23,18 +20,19 @@ class Bootstrap
     {
         $this->container = $this->container ?? new Container();
 
+        // Default to elements being shared
+        $this->container->defaultToShared(true);
+
         // Register the reflection container
         $this->container->delegate(
             new ReflectionContainer(true)
         );
 
         // Add the autoloader
-        $this->container->add(ClassLoader::class, $this->autoloader)
-            ->setShared(true);
+        $this->container->add(ClassLoader::class, $this->autoloader);
 
         // Add the container to itself
-        $this->container->add(Container::class, $this->container)
-            ->setShared(true);
+        $this->container->add(Container::class, $this->container);
     }
 
     public function getContainer(): Container
