@@ -69,7 +69,7 @@ RUN \
         php${PHP_VERSION}-dev \
         libcurl4-openssl-dev \
     && \
-    pecl install --configureoptions 'enable-sockets="yes" enable-hook-curl="yes"' openswoole && \
+    pecl install --configureoptions 'enable-hook-curl="yes"' openswoole && \
     echo "extension=openswoole.so" > /etc/php/${PHP_VERSION}/cli/conf.d/20-openswoole.ini && \
     apt autoremove -y && \
     apt clean -y && \
