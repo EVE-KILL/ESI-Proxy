@@ -58,6 +58,12 @@ class Server
             }
         }
 
+        // Add a catch all route that just replies it doesn't exist
+        $app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{route:.*}', function (Request $request, Response $response) {
+            $response->getBody()->write(json_encode(['error' => 'Route not found']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+        });
+
         $server = new \OpenSwoole\Http\Server($this->options['host'], $this->options['port']);
         $server->on('start', function ($server) {
             $this->logger->log("Swoole http server is started at http://{$this->options['host']}:{$this->options['port']}");
