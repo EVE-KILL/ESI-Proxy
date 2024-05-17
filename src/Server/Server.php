@@ -73,7 +73,7 @@ class Server
                 /** @var DialHomeDevice $dialHomeDevice */
                 $dialHomeDevice = $this->container->get(DialHomeDevice::class);
                 $response = $dialHomeDevice->callHome($this->options['host'], $this->options['port'], $this->options['externalAddress']);
-                $this->logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
+                $this->logger->log('DialHomeDevice response: ' . json_encode($response) ?? 'Unknown error');
             }
         });
 
@@ -100,7 +100,7 @@ class Server
                 /** @var DialHomeDevice $dialHomeDevice */
                 $dialHomeDevice = $this->container->get(DialHomeDevice::class);
                 $response = $dialHomeDevice->callHome($this->options['host'], $this->options['port'], $this->options['externalAddress']);
-                $this->logger->log('DialHomeDevice response: ' . $response['message'] ?? 'Unknown error');
+                $this->logger->log('DialHomeDevice response: ' . json_encode($response) ?? 'Unknown error');
             });
         }
 

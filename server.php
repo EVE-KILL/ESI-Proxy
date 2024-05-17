@@ -1,6 +1,9 @@
 <?php
 
 /** @var \EK\Bootstrap $server */
+
+use EK\Server\Server;
+
 $bootstrap = require_once __DIR__ . '/src/init.php';
 
 $cliApplication = new \Symfony\Component\Console\Application();
@@ -10,6 +13,7 @@ $cliApplication->register('server')
     ->addOption('port', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The port to listen on', 9501)
     ->addOption('external-address', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The external address to use', '')
     ->addOption('dial-home', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Dial home')
+    ->addOption('owner', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The owner to use', '')
     ->addOption('user-agent', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The user agent to use', 'EVE-KILL ESI Proxy/1.0')
     ->addOption('skip304', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Skip 304 responses')
     ->addOption('rate-limit', null, \Symfony\Component\Console\Input\InputOption::VALUE_REQUIRED, 'The rate limit to use', 500)
@@ -24,7 +28,8 @@ $cliApplication->register('server')
     ->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($bootstrap) {
 
         $container = $bootstrap->getContainer();
-        $server = $container->get(\EK\Server\Server::class);
+        /** @var Server $server */
+        $server = $container->get(Server::class);
 
         $options = [
             'host' => $input->getOption('host'),
@@ -32,6 +37,7 @@ $cliApplication->register('server')
             'externalAddress' => $input->getOption('external-address'),
             'dialHome' => $input->getOption('dial-home'),
             'userAgent' => $input->getOption('user-agent'),
+            'owner' => $input->getOption('owner'),
             'skip304' => $input->getOption('skip304'),
             'rateLimit' => $input->getOption('rate-limit'),
             'waitForEsiErrorReset' => $input->getOption('wait-for-esi-error-reset'),

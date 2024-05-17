@@ -2,24 +2,25 @@
 
 namespace EK\EVEKILL;
 
+use EK\Server\Server;
 use GuzzleHttp\Client;
 
 class DialHomeDevice
 {
     protected Client $client;
     public function __construct(
+        protected Server $server
     ) {
        $this->client = new Client([
            'base_uri' => '127.0.0.1:9201'
        ]);
     }
     public function callHome(string $host, int $port, string $externalAddress) {
-        $result = $this->client->post('/proxy/add', [
+        $result = $this->client->post('/api/proxy/add', [
             'json' => [
-                'name' => $this->generateName(),
-                'host' => $host,
-                'port' => $port,
-                'externalAddress' => $externalAddress
+                'id' => $this->generateName(),
+                'url' => $externalAddress,
+                'owner' => $this->server->getOptions()['owner']
             ]
         ]);
 
