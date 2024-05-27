@@ -4,7 +4,7 @@ services:
   redis:
     image: redis:latest
     container_name: redis
-    command: redis-server --save "" --appendonly no
+    command: redis-server --save "" --appendonly no --maxmemory 1024mb
     networks:
       - esiproxy
 
