@@ -1,0 +1,35 @@
+version: '3.7'
+
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --save "" --appendonly no
+    networks:
+      - esiproxy
+
+  esiproxy:
+    image: eve-kill/esi-proxy:latest
+    command:
+      - php
+      - server.php
+      - --host="0.0.0.0"
+      - --port="9501"
+      - --external-address="http://1.2.3.4:9501"
+      - --dial-home
+      - --owner="me@some@email.com"
+      - --user-agent="my-user-agent"
+      - --redis-host=redis
+      - --redis-port=6379
+      - --workers=4
+    container_name: esiproxy
+    ports:
+      - 9501:9501
+    networks:
+      - esiproxy
+    depends_on:
+      - redis
+
+networks:
+  esiproxy:
+    driver: bridge
