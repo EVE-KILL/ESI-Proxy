@@ -1,24 +1,20 @@
-version: '3.7'
-
 services:
   redis:
     image: redis:latest
     container_name: redis
     command: redis-server --save "" --appendonly no --maxmemory 1024mb
     networks:
-      - esiproxy
+      - internal
 
   esiproxy:
-    image: eve-kill/esi-proxy:latest
+    image: ghcr.io/eve-kill/esi-proxy:latest
     command:
-      - php
-      - server.php
-      - --host="0.0.0.0"
-      - --port="9501"
-      - --external-address="http://1.2.3.4:9501"
+      - --host=0.0.0.0
+      - --port=9501
+      - --external-address=http://IP:9501
       - --dial-home
-      - --owner="me@some@email.com"
-      - --user-agent="my-user-agent"
+      - --owner=Name
+      - --user-agent=my-user-agent
       - --redis-host=redis
       - --redis-port=6379
       - --workers=4
@@ -26,10 +22,6 @@ services:
     ports:
       - 9501:9501
     networks:
-      - esiproxy
+      - internal
     depends_on:
       - redis
-
-networks:
-  esiproxy:
-    driver: bridge
