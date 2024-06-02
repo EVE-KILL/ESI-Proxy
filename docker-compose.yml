@@ -8,6 +8,7 @@ services:
 
   esiproxy:
     image: ghcr.io/eve-kill/esi-proxy:latest
+    container_name: esiproxy
     command:
       - --host=0.0.0.0
       - --port=9501
@@ -18,7 +19,6 @@ services:
       - --redis-host=redis
       - --redis-port=6379
       - --workers=4
-    container_name: esiproxy
     ports:
       - 9501:9501
     networks:
