@@ -19,6 +19,8 @@ services:
       - --redis-host=redis
       - --redis-port=6379
       - --workers=4
+    volumes:
+      - /tmp:/tmp
     ports:
       - 9501:9501
     networks:
