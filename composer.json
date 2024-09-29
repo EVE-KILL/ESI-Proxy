@@ -34,7 +34,6 @@
         "roadrunner-php/app-logger": "^1.2"
     },
     "require-dev": {
-        "openswoole/ide-helper": "*",
         "symfony/var-dumper": "*"
     }
 }
