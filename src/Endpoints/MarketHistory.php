@@ -4,7 +4,7 @@ namespace EK\Endpoints;
 
 use EK\Api\Endpoints;
 
-class CharacterHistory extends Endpoints
+class MarketHistory extends Endpoints
 {
     public array $routes = [
         '/{version:latest|dev|v1}/markets/{id}/history[/]' => ['GET'],
