@@ -5,8 +5,8 @@ namespace EK\Api;
 use EK\EVE\EsiFetch;
 use EK\Logger\Logger;
 use EK\Server\Server;
-use OpenSwoole\Core\Psr\ServerRequest as Request;
-use Slim\Psr7\Response;
+use Nyholm\Psr7\Response;
+use Nyholm\Psr7\ServerRequest;
 
 class Endpoints
 {
@@ -30,7 +30,7 @@ class Endpoints
         }
     }
 
-    public function fetch(Request $request, Response $response): array
+    public function fetch(ServerRequest $request, Response $response): array
     {
         // We need to get the path, query, headers and client IP
         $path = $request->getUri()->getPath();
@@ -53,7 +53,7 @@ class Endpoints
         return $this->esiFetcher->fetch($path, $query, $requestBody, $headers, $requestMethod);
     }
 
-    public function handle(Request $request, Response $response): Response
+    public function handle(ServerRequest $request, Response $response): Response
     {
         $result = $this->fetch($request, $response);
 

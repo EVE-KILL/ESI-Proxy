@@ -16,18 +16,22 @@
     },
     "require": {
         "php": "^8.3",
-        "ext-openswoole": "*",
         "ext-redis": "*",
-        "openswoole/core": "*",
         "monolog/monolog": "*",
         "league/container": "*",
         "mongodb/mongodb": "*",
         "slim/slim": "*",
-        "slim/psr7": "1.6.1",
+        "slim/psr7": "*",
         "symfony/console": "*",
         "guzzlehttp/guzzle": "*",
         "kcs/class-finder": "*",
-        "predis/predis": "*"
+        "predis/predis": "*",
+        "spiral/roadrunner-cli": "*",
+        "nyholm/psr7": "*",
+        "spiral/roadrunner-http": "*",
+        "spiral/roadrunner": "*",
+        "vlucas/phpdotenv": "^5.6",
+        "roadrunner-php/app-logger": "^1.2"
     },
     "require-dev": {
         "openswoole/ide-helper": "*",

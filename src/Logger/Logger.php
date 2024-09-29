@@ -2,22 +2,21 @@
 
 namespace EK\Logger;
 
-use Monolog\Level;
-use Monolog\Logger as MonologLogger;
+use Spiral\Goridge\RPC\RPC;
+use Spiral\RoadRunner\Logger as RoadRunnerLogger;
 
 class Logger
 {
-    protected MonologLogger $logger;
+    protected $logger;
 
-    public function __construct(
-    )
+    public function __construct()
     {
-        $this->logger = new MonologLogger('http-server');
-        $this->logger->pushHandler(new \Monolog\Handler\StreamHandler('php://stdout'), Level::Debug);
+        $rpc = RPC::create('tcp://127.0.0.1:6001');
+        $this->logger = new RoadRunnerLogger($rpc);
     }
 
     public function log(string $message, array $context = []): void
     {
-        $this->logger->log(Level::Debug, $message, $context);
+        $this->logger->log($message, json_encode($context));
     }
 }

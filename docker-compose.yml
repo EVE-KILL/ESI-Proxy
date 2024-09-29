@@ -15,10 +15,8 @@ services:
       - --external-address=http://IP:9501
       - --dial-home
       - --owner=Name
-      - --user-agent=my-user-agent
       - --redis-host=redis
       - --redis-port=6379
-      - --workers=4
     volumes:
       - /tmp:/tmp
     ports:

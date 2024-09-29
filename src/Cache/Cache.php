@@ -14,10 +14,10 @@ class Cache
         protected Server $server,
         protected Logger $logger
     ) {
-        $redisHost = $this->server->getOptions()['redisHost'];
-        $redisPort = $this->server->getOptions()['redisPort'];
-        $redisPassword = $this->server->getOptions()['redisPassword'];
-        $redisDatabase = $this->server->getOptions()['redisDatabase'];
+        $redisHost = $_ENV['REDIS_HOST'];
+        $redisPort = $_ENV['REDIS_PORT'];
+        $redisPassword = $_ENV['REDIS_PASSWORD'];
+        $redisDatabase = $_ENV['REDIS_DATABASE'];
 
         $this->redis = new Client([
             'scheme' => 'tcp',

@@ -66,13 +66,7 @@ RUN \
         php${PHP_VERSION}-fileinfo \
         php${PHP_VERSION}-uploadprogress \
         php${PHP_VERSION}-sqlite3 \
-        php${PHP_VERSION}-dev \
-        libcurl4-openssl-dev \
     && \
-    pecl install --configureoptions 'enable-hook-curl="yes"' openswoole && \
-    echo "extension=openswoole.so" > /etc/php/${PHP_VERSION}/cli/conf.d/20-openswoole.ini && \
-    apt autoremove -y && \
-    apt clean -y && \
     # Cleanup
     rm -rf /tmp/* /src
 
@@ -86,7 +80,9 @@ COPY . /app
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 # Install packages
-RUN composer install
+RUN \
+    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-suggest --optimize-autoloader --apcu-autoloader && \
+    php vendor/bin/rr get-binary
 
 # Copy in the module configurations
 COPY .docker/config/modules/* /etc/php/${PHP_VERSION}/mods-available/
