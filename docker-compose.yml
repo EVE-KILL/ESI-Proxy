@@ -9,14 +9,16 @@ services:
   esiproxy:
     image: ghcr.io/eve-kill/esi-proxy:latest
     container_name: esiproxy
-    command:
-      - --host=0.0.0.0
-      - --port=9501
-      - --external-address=http://IP:9501
-      - --dial-home
-      - --owner=Name
-      - --redis-host=redis
-      - --redis-port=6379
+    environment:
+      HOST=0.0.0.0
+      PORT=9501
+      EXTERNAL_ADDRESS=http://IP:9501
+      DIAL_HOME=true
+      OWNER=Name
+      REDIS_HOST=127.0.0.1
+      REDIS_PORT=6379
+      REDIS_PASSWORD=
+      REDIS_DATABASE=0
     volumes:
       - /tmp:/tmp
     ports:
