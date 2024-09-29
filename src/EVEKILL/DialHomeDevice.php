@@ -20,7 +20,7 @@ class DialHomeDevice
             'json' => [
                 'id' => $this->generateName(),
                 'url' => $externalAddress,
-                'owner' => $this->server->getOptions()['owner']
+                'owner' => $_ENV['OWNER']
             ]
         ]);
 
