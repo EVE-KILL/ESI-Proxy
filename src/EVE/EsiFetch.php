@@ -2,7 +2,6 @@
 
 namespace EK\EVE;
 
-use bandwidthThrottle\tokenBucket\BlockingConsumer;
 use EK\Cache\Cache;
 use EK\Logger\Logger;
 use GuzzleHttp\Client;

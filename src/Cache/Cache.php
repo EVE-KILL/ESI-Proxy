@@ -19,6 +19,8 @@ class Cache
         $redisPassword = $_ENV['REDIS_PASSWORD'];
         $redisDatabase = $_ENV['REDIS_DATABASE'];
 
+        dump($redisHost, $redisPort, $redisPassword, $redisDatabase);
+
         $this->redis = new Client([
             'scheme' => 'tcp',
             'host' => $redisHost,

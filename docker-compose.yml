@@ -10,15 +10,15 @@ services:
     image: ghcr.io/eve-kill/esi-proxy:latest
     container_name: esiproxy
     environment:
-      HOST=0.0.0.0
-      PORT=9501
-      EXTERNAL_ADDRESS=http://IP:9501
-      DIAL_HOME=true
-      OWNER=Name
-      REDIS_HOST=127.0.0.1
-      REDIS_PORT=6379
-      REDIS_PASSWORD=
-      REDIS_DATABASE=0
+      - HOST=0.0.0.0
+      - PORT=9501
+      - EXTERNAL_ADDRESS=http://IP:9501  # Replace "IP" with the actual external IP or domain
+      - DIAL_HOME=true
+      - OWNER=Name  # Replace "Name" with the actual owner name
+      - REDIS_HOST=redis  # Refer to the 'redis' service within the Docker network
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=  # Empty string for no password
+      - REDIS_DATABASE=0
     volumes:
       - /tmp:/tmp
     ports:
@@ -27,3 +27,7 @@ services:
       - internal
     depends_on:
       - redis
+
+networks:
+  internal:
+    driver: bridge
