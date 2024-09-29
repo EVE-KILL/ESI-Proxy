@@ -7,6 +7,7 @@ use EK\EVEKILL\DialHomeDevice;
 use EK\Server\RoadRunner;
 
 $bootstrap = require_once __DIR__ . '/src/init.php';
+$container = $bootstrap->getContainer();
 
 // load env using dotenv
 if (file_exists(__DIR__ . '/.env')) {
@@ -21,8 +22,6 @@ if ($dialHome && $_ENV['EXTERNAL_ADDRESS'] !== '') {
     $response = $dialHomeDevice->callHome($_ENV['HOST'], $_ENV['PORT'], $_ENV['EXTERNAL_ADDRESS']);
     echo 'DialHomeDevice response: ' . json_encode($response) ?? 'Unknown error';
 }
-
-$container = $bootstrap->getContainer();
 
 $roadRunner = $container->get(RoadRunner::class);
 $roadRunner->run();
