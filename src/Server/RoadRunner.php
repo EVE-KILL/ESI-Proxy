@@ -61,6 +61,12 @@ class RoadRunner
             return $response->withHeader('Content-Type', 'application/json');
         });
 
+        $app->get('/esi', function (ServerRequest $request, Response $response) {
+            $esiPage = file_get_contents('https://esi.evetech.net');
+            $response->getBody()->write($esiPage);
+            return $response;
+        });
+
         // Load all the endpoints
         $endpoints = new ComposerFinder();
         $endpoints->inNamespace('EK\\Endpoints');
