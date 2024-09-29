@@ -88,6 +88,8 @@ class EsiFetch
             // Ensure sleep time is not too short, minimum of 1 millisecond (1000 microseconds)
             $sleepTimeInMicroseconds = max(1000, $sleepTimeInMicroseconds);
 
+            $this->logger->log('Sleeping for ' . $sleepTimeInMicroseconds . ' microseconds', ['remaining' => $esiErrorLimitRemaining, 'reset' => $esiErrorLimitReset]);
+
             // Apply usleep (sleep in microseconds)
             usleep($sleepTimeInMicroseconds);
         }
