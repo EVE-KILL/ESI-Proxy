@@ -22,7 +22,7 @@ class EsiFetch
         ]);
     }
 
-    public function fetch(string $path, array $query = [], string $requestBody = '', array $headers = [], array $options = [], bool $waitForEsiErrorReset = false, string $requestMethod = 'GET'): array
+    public function fetch(string $path, array $query = [], string $requestBody = '', array $headers = [], string $requestMethod = 'GET'): array
     {
         // Get the cache key for this request
         $cacheKey = $this->getCacheKey($path, $query, $headers);
@@ -30,9 +30,6 @@ class EsiFetch
         // If the cache key exists, return the cached response
         if ($this->cache->exists($cacheKey)) {
             $result = $this->cache->get($cacheKey);
-            if (isset($options['skip304']) && $options['skip304'] === false) {
-                $result['status'] = 304;
-            }
             $result['headers']['X-EK-Cache'] = 'HIT';
             return $result;
         }
@@ -42,6 +39,7 @@ class EsiFetch
             'query' => $query,
             'headers' => $headers,
             'body' => $requestBody,
+            'timeout' => 30,
             'http_errors' => false
         ]);
 

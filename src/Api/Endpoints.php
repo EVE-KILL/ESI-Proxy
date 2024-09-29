@@ -21,9 +21,6 @@ class Endpoints
         protected EsiFetch $esiFetcher,
         protected Logger $logger
     ) {
-        $this->rateLimit = $this->options('rateLimit', 500);
-        $this->userAgent = $this->options('userAgent', 'ESI-PROXY/1.0');
-
         // Ensure that the hard rate limit always takes precedence (But ignore it if it's 0)
         if ($this->rateLimit > 0 || $this->hardRateLimit > 0) {
             if ($this->hardRateLimit > 0 && $this->hardRateLimit < $this->rateLimit) {
@@ -53,7 +50,7 @@ class Endpoints
         }
 
         // Get the data from ESI
-        return $this->esiFetcher->fetch($path, $query, $requestBody, $headers, [], $this->options('waitForEsiErrorReset', false), $requestMethod);
+        return $this->esiFetcher->fetch($path, $query, $requestBody, $headers, $requestMethod);
     }
 
     public function handle(Request $request, Response $response): Response
