@@ -22,7 +22,7 @@ $dialHome = in_array($_ENV['DIAL_HOME'], ['true', true, 1, '1']);
 if ($dialHome && $_ENV['EXTERNAL_ADDRESS'] !== '') {
     $dialHomeDevice = $container->get(DialHomeDevice::class);
     $response = $dialHomeDevice->callHome($_ENV['HOST'], $_ENV['PORT'], $_ENV['EXTERNAL_ADDRESS']);
-    $this->logger->log('DialHomeDevice response: ' . json_encode($response) ?? 'Unknown error');
+    $logger->log('DialHomeDevice response: ' . json_encode($response) ?? 'Unknown error');
 }
 
 $roadRunner = $container->get(RoadRunner::class);
