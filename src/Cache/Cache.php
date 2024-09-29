@@ -12,10 +12,10 @@ class Cache
     public function __construct(
         protected Logger $logger
     ) {
-        $redisHost = $_ENV['REDIS_HOST'];
-        $redisPort = $_ENV['REDIS_PORT'];
-        $redisPassword = $_ENV['REDIS_PASSWORD'];
-        $redisDatabase = $_ENV['REDIS_DATABASE'];
+        $redisHost = $_ENV['REDIS_HOST'] ?? '127.0.0.1';
+        $redisPort = $_ENV['REDIS_PORT'] ?? 6379;
+        $redisPassword = $_ENV['REDIS_PASSWORD'] ?? '';
+        $redisDatabase = $_ENV['REDIS_DATABASE'] ?? 0;
 
         $this->redis = new Client([
             'scheme' => 'tcp',
