@@ -2,11 +2,6 @@
 
 namespace EK\Api;
 
-use bandwidthThrottle\tokenBucket\BlockingConsumer;
-use bandwidthThrottle\tokenBucket\Rate;
-use bandwidthThrottle\tokenBucket\storage\FileStorage;
-use bandwidthThrottle\tokenBucket\TokenBucket;
-use EK\Bootstrap;
 use EK\EVE\EsiFetch;
 use EK\Logger\Logger;
 use EK\Server\Server;
@@ -18,9 +13,8 @@ class Endpoints
     public int $priority = 0;
     public array $routes = [];
     public int $hardRateLimit = 0;
-    public int $rateLimit = 500;
-    public string $userAgent = 'EVEKill/1.0';
-    protected BlockingConsumer $rateLimitBucket;
+    public int $rateLimit = 1000;
+    public string $userAgent = 'ESI-PROXY/1.0';
 
     public function __construct(
         protected Server $server,
@@ -28,7 +22,7 @@ class Endpoints
         protected Logger $logger
     ) {
         $this->rateLimit = $this->options('rateLimit', 500);
-        $this->userAgent = $this->options('userAgent', 'EVE-KILL ESI Proxy/1.0');
+        $this->userAgent = $this->options('userAgent', 'ESI-PROXY/1.0');
 
         // Ensure that the hard rate limit always takes precedence (But ignore it if it's 0)
         if ($this->rateLimit > 0 || $this->hardRateLimit > 0) {
@@ -36,15 +30,6 @@ class Endpoints
                 $this->rateLimit = $this->hardRateLimit;
             }
             $this->logger->log(get_class($this) . ' rate limit is enabled and set to ' . $this->rateLimit);
-
-            // Create the rate limit bucket
-            $className = str_replace('\\', '_', get_class($this));
-            $bucketPath = '/tmp/' . $className . '_rate_limit.bucket';
-            $storage = new FileStorage($bucketPath);
-            $rate = new Rate($this->rateLimit, Rate::SECOND);
-            $bucket = new TokenBucket($this->rateLimit, $rate, $storage);
-            $bucket->bootstrap($this->rateLimit);
-            $this->rateLimitBucket = new BlockingConsumer($bucket);
         }
     }
 
@@ -68,7 +53,7 @@ class Endpoints
         }
 
         // Get the data from ESI
-        return $this->esiFetcher->fetch($path, $query, $requestBody, $headers, [], $this->options('waitForEsiErrorReset', false), $this->rateLimitBucket, $requestMethod);
+        return $this->esiFetcher->fetch($path, $query, $requestBody, $headers, [], $this->options('waitForEsiErrorReset', false), $requestMethod);
     }
 
     public function handle(Request $request, Response $response): Response

@@ -4,62 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8bb27030f1dd888a38b97a4d85fe7630",
+    "content-hash": "10582c38651e2dc11e3408589a0bed34",
     "packages": [
-        {
-            "name": "bandwidth-throttle/token-bucket",
-            "version": "0.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/bandwidth-throttle/token-bucket.git",
-                "reference": "939abf11364d6359a23145edc5d225cca1f459ba"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/bandwidth-throttle/token-bucket/zipball/939abf11364d6359a23145edc5d225cca1f459ba",
-                "reference": "939abf11364d6359a23145edc5d225cca1f459ba",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=5.5"
-            },
-            "require-dev": {
-                "mikey179/vfsstream": "^1.5.0",
-                "php-mock/php-mock-phpunit": "^0.3",
-                "phpunit/phpunit": "^4"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "bandwidthThrottle\\tokenBucket\\": "classes/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "WTFPL"
-            ],
-            "authors": [
-                {
-                    "name": "Markus Malkusch",
-                    "email": "markus@malkusch.de",
-                    "homepage": "http://markus.malkusch.de",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Implementation of the Token Bucket algorithm.",
-            "homepage": "https://github.com/bandwidth-throttle/token-bucket",
-            "keywords": [
-                "Rate",
-                "bandwidth",
-                "limit",
-                "token bucket"
-            ],
-            "support": {
-                "issues": "https://github.com/bandwidth-throttle/token-bucket/issues",
-                "source": "https://github.com/bandwidth-throttle/token-bucket/tree/master"
-            },
-            "time": "2015-07-11T22:32:17+00:00"
-        },
         {
             "name": "fig/http-message-util",
             "version": "1.1.5",

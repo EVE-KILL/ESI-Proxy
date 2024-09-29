@@ -7,8 +7,8 @@ use EK\Api\Endpoints;
 class CharacterHistory extends Endpoints
 {
     public array $routes = [
-        '/{version:latest|dev|v1}/markets/{id}/history[/]' => ['GET'],
+        '/{version:latest|dev|v1}/characters/{id}/history[/]' => ['GET'],
     ];
 
-    public int $hardRateLimit = 5;
+    public int $hardRateLimit = 10;
 }
