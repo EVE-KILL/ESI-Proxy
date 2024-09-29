@@ -4,7 +4,6 @@ namespace EK\Api;
 
 use EK\EVE\EsiFetch;
 use EK\Logger\Logger;
-use EK\Server\Server;
 use Nyholm\Psr7\Response;
 use Nyholm\Psr7\ServerRequest;
 
@@ -17,7 +16,6 @@ class Endpoints
     public string $userAgent = 'ESI-PROXY/1.0';
 
     public function __construct(
-        protected Server $server,
         protected EsiFetch $esiFetcher,
         protected Logger $logger
     ) {
@@ -71,10 +69,5 @@ class Endpoints
             ->write($result['body']);
 
         return $response;
-    }
-
-    public function options(string $key, mixed $default): mixed
-    {
-        return $this->server->getOptions()[$key] ?? $default;
     }
 }

@@ -1,7 +1,5 @@
 <?php
 
-/** @var \EK\Bootstrap $server */
-
 use Dotenv\Dotenv;
 use EK\EVEKILL\DialHomeDevice;
 use EK\Logger\Logger;

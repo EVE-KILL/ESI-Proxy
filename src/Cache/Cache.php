@@ -3,7 +3,6 @@
 namespace EK\Cache;
 
 use EK\Logger\Logger;
-use EK\Server\Server;
 use Predis\Client;
 use Predis\Response\Status;
 
@@ -11,7 +10,6 @@ class Cache
 {
     protected Client $redis;
     public function __construct(
-        protected Server $server,
         protected Logger $logger
     ) {
         $redisHost = $_ENV['REDIS_HOST'];
