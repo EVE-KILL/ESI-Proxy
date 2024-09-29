@@ -19,6 +19,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=  # Empty string for no password
       - REDIS_DATABASE=0
+      - WORKERS=4
     volumes:
       - /tmp:/tmp
     ports:

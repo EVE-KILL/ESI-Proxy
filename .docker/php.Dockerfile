@@ -100,5 +100,7 @@ RUN chmod +x /entrypoint.sh
 WORKDIR /app
 ARG PHP_VERSION="8.3"
 ENV PHP_VERSION=${PHP_VERSION}
+ARG WORKERS=4
+ENV WORKERS=${WORKERS}
 EXPOSE 9501
-CMD ["/app/rr", "serve", "-w", "/app"]
+CMD ["/app/rr", "serve", "-w", "/app", "-o", "http.pool.num_workers=${WORKERS}"]
