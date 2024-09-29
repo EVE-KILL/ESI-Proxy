@@ -2,14 +2,12 @@
 
 namespace EK\EVEKILL;
 
-use EK\Server\Server;
 use GuzzleHttp\Client;
 
 class DialHomeDevice
 {
     protected Client $client;
     public function __construct(
-        protected Server $server
     ) {
        $this->client = new Client([
            'base_uri' => 'https://eve-kill.com'
