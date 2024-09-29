@@ -8,8 +8,10 @@ use EK\Server\RoadRunner;
 $bootstrap = require_once __DIR__ . '/src/init.php';
 
 // load env using dotenv
-$dotenv = Dotenv::createImmutable(__DIR__);
-$dotenv->load();
+if (file_exists(__DIR__ . '/.env')) {
+    $dotenv = Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+}
 
 $container = $bootstrap->getContainer();
 
