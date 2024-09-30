@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/patrickmn/go-cache"
+	"golang.org/x/net/http2"
 	"io"
 	"io/ioutil"
 	"log"
@@ -204,6 +206,20 @@ func main() {
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
+	// Enable HTTP/2
+	proxy.Transport = &http2.Transport{
+		AllowHTTP: true,
+	}
+
+	// Set timeouts for the HTTP client
+	client := &http.Client{
+		Timeout: 10 * time.Second, // Upstream timeout
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+		},
+	}
+	proxy.Transport = client.Transport
+
 	// Create a custom Director to modify the request
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
@@ -217,6 +233,14 @@ func main() {
 
 	// Create a custom ModifyResponse function to log response details and perform rate limiting
 	proxy.ModifyResponse = func(resp *http.Response) error {
+		// Enable Gzip compression
+		if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+			resp.Body, err = gzip.NewReader(resp.Body)
+			if err != nil {
+				return err
+			}
+		}
+
 		esiErrorLimitRemaining := 100
 		esiErrorLimitReset := 0
 
@@ -266,35 +290,45 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodConnect {
-			handleConnect(w, r)
-		} else if r.Method == http.MethodGet && r.URL.Path == "/" {
-			// Serve the information page for GET requests on the root path
-			fmt.Fprint(w, infoPageTemplate)
-		} else {
-			// Check cache before forwarding the request
-			if cachedResp, found := getCachedResponse(r); found {
-				for k, v := range cachedResp.Header {
-					for _, vv := range v {
-						w.Header().Add(k, vv)
+	// Set timeouts for the HTTP server
+	server := &http.Server{
+		Addr:         fmt.Sprintf("%s:%s", *host, *httpPort),
+		Handler:      http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodConnect {
+				handleConnect(w, r)
+			} else if r.Method == http.MethodGet && r.URL.Path == "/" {
+				// Serve the information page for GET requests on the root path
+				fmt.Fprint(w, infoPageTemplate)
+			} else if r.URL.Path == "/healthz" {
+				healthzHandler(w, r)
+			} else if r.URL.Path == "/readyz" {
+				readyzHandler(w, r)
+			} else {
+				// Check cache before forwarding the request
+				if cachedResp, found := getCachedResponse(r); found {
+					for k, v := range cachedResp.Header {
+						for _, vv := range v {
+							w.Header().Add(k, vv)
+						}
 					}
+					w.WriteHeader(cachedResp.StatusCode)
+					w.Write(cachedResp.Body)
+					return
 				}
-				w.WriteHeader(cachedResp.StatusCode)
-				w.Write(cachedResp.Body)
-				return
+
+				// Forward all other requests to the proxy
+				proxy.ServeHTTP(w, r)
 			}
+		}),
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 
-			// Forward all other requests to the proxy
-			proxy.ServeHTTP(w, r)
-		}
-	})
-
-	httpAddress := fmt.Sprintf("%s:%s", *host, *httpPort)
-	log.Printf("Proxy server is running on http://%s", httpAddress)
+	log.Printf("Proxy server is running on http://%s", server.Addr)
 
 	// Start HTTP server
-	log.Fatal(http.ListenAndServe(httpAddress, nil))
+	log.Fatal(server.ListenAndServe())
 }
 
 // singleJoiningSlash is a helper function to join URL paths
@@ -308,4 +342,15 @@ func singleJoiningSlash(a, b string) string {
 		return a + "/" + b
 	}
 	return a + b
+}
+
+// Health check endpoints
+func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+}
+
+func readyzHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
 }
