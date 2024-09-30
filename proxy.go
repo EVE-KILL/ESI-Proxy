@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/patrickmn/go-cache"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -138,6 +140,57 @@ func transfer(destination io.WriteCloser, source io.ReadCloser) {
 	io.Copy(destination, source)
 }
 
+var c = cache.New(5*time.Minute, 10*time.Minute)
+
+func cacheKey(req *http.Request) string {
+	return req.Method + ":" + req.URL.String()
+}
+
+type CachedResponse struct {
+	StatusCode int
+	Header     http.Header
+	Body       []byte
+}
+
+func cacheResponse(resp *http.Response) (*http.Response, error) {
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	cacheDuration := 5 * time.Minute
+	if cacheControl := resp.Header.Get("Cache-Control"); cacheControl != "" {
+		if maxAgeIndex := strings.Index(cacheControl, "max-age="); maxAgeIndex != -1 {
+			maxAgeStr := cacheControl[maxAgeIndex+8:]
+			if commaIndex := strings.Index(maxAgeStr, ","); commaIndex != -1 {
+				maxAgeStr = maxAgeStr[:commaIndex]
+			}
+			if maxAge, err := strconv.Atoi(maxAgeStr); err == nil {
+				cacheDuration = time.Duration(maxAge) * time.Second
+			}
+		}
+	}
+
+	cachedResp := &CachedResponse{
+		StatusCode: resp.StatusCode,
+		Header:     resp.Header,
+		Body:       bodyBytes,
+	}
+
+	c.Set(cacheKey(resp.Request), cachedResp, cacheDuration)
+	return resp, nil
+}
+
+func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
+	if cachedResp, found := c.Get(cacheKey(req)); found {
+		if resp, ok := cachedResp.(*CachedResponse); ok {
+			return resp, true
+		}
+	}
+	return nil, false
+}
+
 func main() {
 	// Define command-line flags
 	host := flag.String("host", "localhost", "Host to listen on")
@@ -192,6 +245,12 @@ func main() {
 			time.Sleep(sleepTimeInMicroseconds)
 		}
 
+		// Cache the response
+		_, err := cacheResponse(resp)
+		if err != nil {
+			log.Printf("Error caching response: %v", err)
+		}
+
 		return nil
 	}
 
@@ -214,6 +273,18 @@ func main() {
 			// Serve the information page for GET requests on the root path
 			fmt.Fprint(w, infoPageTemplate)
 		} else {
+			// Check cache before forwarding the request
+			if cachedResp, found := getCachedResponse(r); found {
+				for k, v := range cachedResp.Header {
+					for _, vv := range v {
+						w.Header().Add(k, vv)
+					}
+				}
+				w.WriteHeader(cachedResp.StatusCode)
+				w.Write(cachedResp.Body)
+				return
+			}
+
 			// Forward all other requests to the proxy
 			proxy.ServeHTTP(w, r)
 		}
