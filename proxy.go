@@ -145,7 +145,7 @@ func transfer(destination io.WriteCloser, source io.ReadCloser) {
 var c = cache.New(5*time.Minute, 10*time.Minute)
 
 func cacheKey(req *http.Request) string {
-	return req.Method + ":" + req.URL.String()
+	return req.Method + ":" + req.URL.Path + "?" + req.URL.RawQuery
 }
 
 type CachedResponse struct {
@@ -186,18 +186,18 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 	}
 
 	c.Set(cacheKey(resp.Request), cachedResp, cacheDuration)
-	log.Printf("Cached response for %s with status %d", resp.Request.URL.String(), resp.StatusCode)
+	log.Printf("Cached response for %s", cacheKey(resp.Request))
 	return resp, nil
 }
 
 func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
 	if cachedResp, found := c.Get(cacheKey(req)); found {
 		if resp, ok := cachedResp.(*CachedResponse); ok {
-			log.Printf("Cache hit for %s", req.URL.String())
+			log.Printf("Cache hit for %s", cacheKey(req))
 			return resp, true
 		}
 	}
-	log.Printf("Cache miss for %s", req.URL.String())
+	log.Printf("Cache miss for %s", cacheKey(req))
 	return nil, false
 }
 
