@@ -1,34 +1,19 @@
-services:
-  redis:
-    image: redis:latest
-    container_name: redis
-    command: redis-server --save "" --appendonly no --maxmemory 1024mb
-    networks:
-      - internal
+version: '3.8'
 
-  esiproxy:
+services:
+  esi-proxy:
     image: ghcr.io/eve-kill/esi-proxy:latest
-    container_name: esiproxy
-    environment:
-      - HOST=0.0.0.0
-      - PORT=9501
-      - EXTERNAL_ADDRESS=http://IP:9501  # Replace "IP" with the actual external IP or domain
-      - DIAL_HOME=true
-      - OWNER=Name  # Replace "Name" with the actual owner name
-      - REDIS_HOST=redis  # Refer to the 'redis' service within the Docker network
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=  # Empty string for no password
-      - REDIS_DATABASE=0
-      - WORKERS=4
-    volumes:
-      - /tmp:/tmp
     ports:
-      - 9501:9501
+      - "9501:9501"
+    environment:
+      - OWNER=${OWNER}
+      - DIAL_HOME=${DIAL_HOME}
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
+    volumes:
+      - ./esi-proxy-name:/tmp/esi-proxy.name
     networks:
-      - internal
-    depends_on:
-      - redis
+      - proxy
 
 networks:
-  internal:
+  proxy:
     driver: bridge

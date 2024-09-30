@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: esi-proxy
+  labels:
+    app: esi-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: esi-proxy
+  template:
+    metadata:
+      labels:
+        app: esi-proxy
+    spec:
+      containers:
+      - name: esi-proxy
+        image: ghcr.io/eve-kill/esi-proxy:latest
+        ports:
+        - containerPort: 9501
+        env:
+        - name: OWNER
+          valueFrom:
+            configMapKeyRef:
+              name: esi-proxy-config
+              key: OWNER
+        - name: DIAL_HOME
+          valueFrom:
+            configMapKeyRef:
+              name: esi-proxy-config
+              key: DIAL_HOME
+        - name: EXTERNAL_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: esi-proxy-config
+              key: EXTERNAL_ADDRESS
+        volumeMounts:
+        - name: esi-proxy-name
+          mountPath: /tmp/esi-proxy.name
+      volumes:
+      - name: esi-proxy-name
+        configMap:
+          name: esi-proxy-config
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: esi-proxy-config
+data:
+  OWNER: "your_owner_value"
+  DIAL_HOME: "your_dial_home_value"
+  EXTERNAL_ADDRESS: "your_external_address_value"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: esi-proxy
+spec:
+  selector:
+    app: esi-proxy
+  ports:
+    - protocol: TCP
+      port: 9501
+      targetPort: 9501
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: esi-proxy-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  rules:
+  - host: esi.eve-kill.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: esi-proxy
+            port:
+              number: 9501
+  tls:
+  - hosts:
+    - esi.eve-kill.com
+    secretName: esi-proxy-tls
