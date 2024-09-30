@@ -216,9 +216,7 @@ func main() {
 		AllowHTTP: true,
 	}
 
-	// Set timeouts for the HTTP client
 	client := &http.Client{
-		Timeout: 10 * time.Second, // Upstream timeout
 		Transport: &http2.Transport{
 			AllowHTTP: true,
 		},
@@ -295,7 +293,6 @@ func main() {
 		}
 	}
 
-	// Set timeouts for the HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", *host, *httpPort),
 		Handler:      http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -324,10 +321,7 @@ func main() {
 				// Forward all other requests to the proxy
 				proxy.ServeHTTP(w, r)
 			}
-		}),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		})
 	}
 
 	log.Printf("Proxy server is running on http://%s", server.Addr)
