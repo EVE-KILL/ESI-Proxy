@@ -161,6 +161,11 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 	}
 	resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
+	// Only cache if the status code is 200 or 304
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotModified {
+		return resp, nil
+	}
+
 	cacheDuration := 5 * time.Minute
 	if cacheControl := resp.Header.Get("Cache-Control"); cacheControl != "" {
 		if maxAgeIndex := strings.Index(cacheControl, "max-age="); maxAgeIndex != -1 {
