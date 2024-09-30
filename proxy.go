@@ -186,15 +186,18 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 	}
 
 	c.Set(cacheKey(resp.Request), cachedResp, cacheDuration)
+	log.Printf("Cached response for %s with status %d", resp.Request.URL.String(), resp.StatusCode)
 	return resp, nil
 }
 
 func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
 	if cachedResp, found := c.Get(cacheKey(req)); found {
 		if resp, ok := cachedResp.(*CachedResponse); ok {
+			log.Printf("Cache hit for %s", req.URL.String())
 			return resp, true
 		}
 	}
+	log.Printf("Cache miss for %s", req.URL.String())
 	return nil, false
 }
 
@@ -293,6 +296,7 @@ func main() {
 		}
 	}
 
+	// Set timeouts for the HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", *host, *httpPort),
 		Handler:      http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -322,6 +326,9 @@ func main() {
 				proxy.ServeHTTP(w, r)
 			}
 		}),
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	log.Printf("Proxy server is running on http://%s", server.Addr)
