@@ -9,8 +9,7 @@ services:
       - OWNER=${OWNER}
       - DIAL_HOME=${DIAL_HOME}
       - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
-    volumes:
-      - ./esi-proxy-name:/tmp/esi-proxy.name
+      - ESI_PROXY_NAME=${ESI_PROXY_NAME}
     networks:
       - proxy
 

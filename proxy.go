@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -73,28 +72,16 @@ type DialHomeResponse struct {
 }
 
 func generateName() string {
-	namePath := "/tmp/esi-proxy.name"
-
-	if _, err := os.Stat(namePath); err == nil {
-		data, err := ioutil.ReadFile(namePath)
-		if err == nil {
-			return string(data)
+	name := os.Getenv("ESI_PROXY_NAME")
+	if name == "" {
+		nameBytes := make([]byte, 16)
+		_, err := rand.Read(nameBytes)
+		if err != nil {
+			log.Fatal(err)
 		}
+		name = hex.EncodeToString(nameBytes)
 	}
-
-	name := make([]byte, 16)
-	_, err := rand.Read(name)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	hexName := hex.EncodeToString(name)
-	err = ioutil.WriteFile(namePath, []byte(hexName), 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return hexName
+	return name
 }
 
 func dialHome(externalAddress string) {
