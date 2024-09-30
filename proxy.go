@@ -321,7 +321,7 @@ func main() {
 				// Forward all other requests to the proxy
 				proxy.ServeHTTP(w, r)
 			}
-		})
+		}),
 	}
 
 	log.Printf("Proxy server is running on http://%s", server.Addr)
