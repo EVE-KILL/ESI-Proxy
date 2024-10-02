@@ -155,6 +155,11 @@ type CachedResponse struct {
 }
 
 func cacheResponse(resp *http.Response) (*http.Response, error) {
+	// Ensure only GET requests are cached
+	if resp.Request.Method != http.MethodGet {
+		return resp, nil
+	}
+
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -191,6 +196,11 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 }
 
 func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
+	// Only attempt to retrieve cache for GET requests
+	if req.Method != http.MethodGet {
+		return nil, false
+	}
+
 	if cachedResp, found := c.Get(cacheKey(req)); found {
 		if resp, ok := cachedResp.(*CachedResponse); ok {
 			log.Printf("Cache hit for %s", cacheKey(req))
@@ -263,22 +273,24 @@ func main() {
 		log.Printf("ESI Error Limit Reset: %d", esiErrorLimitReset)
 
 		if esiErrorLimitRemaining < 100 {
-			maxSleepTimeInMicroseconds := time.Duration(esiErrorLimitReset) * time.Second
+			maxSleepTime := time.Duration(esiErrorLimitReset) * time.Second
 			inverseFactor := float64(100-esiErrorLimitRemaining) / 100
-			sleepTimeInMicroseconds := time.Duration(inverseFactor * inverseFactor * float64(maxSleepTimeInMicroseconds))
+			sleepTime := time.Duration(inverseFactor * inverseFactor * float64(maxSleepTime))
 
-			if sleepTimeInMicroseconds < time.Millisecond {
-				sleepTimeInMicroseconds = time.Millisecond
+			if sleepTime < time.Millisecond {
+				sleepTime = time.Millisecond
 			}
 
-			log.Printf("Sleeping for %s", sleepTimeInMicroseconds)
-			time.Sleep(sleepTimeInMicroseconds)
+			log.Printf("Sleeping for %s", sleepTime)
+			time.Sleep(sleepTime)
 		}
 
-		// Cache the response
-		_, err := cacheResponse(resp)
-		if err != nil {
-			log.Printf("Error caching response: %v", err)
+		// Cache the response only if the request method is GET
+		if resp.Request.Method == http.MethodGet {
+			_, err := cacheResponse(resp)
+			if err != nil {
+				log.Printf("Error caching response: %v", err)
+			}
 		}
 
 		return nil
@@ -298,8 +310,8 @@ func main() {
 
 	// Set timeouts for the HTTP server
 	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%s", *host, *httpPort),
-		Handler:      http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Addr: fmt.Sprintf("%s:%s", *host, *httpPort),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodConnect {
 				handleConnect(w, r)
 			} else if r.Method == http.MethodGet && r.URL.Path == "/" {
@@ -310,16 +322,19 @@ func main() {
 			} else if r.URL.Path == "/readyz" {
 				readyzHandler(w, r)
 			} else {
-				// Check cache before forwarding the request
-				if cachedResp, found := getCachedResponse(r); found {
-					for k, v := range cachedResp.Header {
-						for _, vv := range v {
-							w.Header().Add(k, vv)
+				// Only cache GET requests
+				if r.Method == http.MethodGet {
+					// Check cache before forwarding the request
+					if cachedResp, found := getCachedResponse(r); found {
+						for k, v := range cachedResp.Header {
+							for _, vv := range v {
+								w.Header().Add(k, vv)
+							}
 						}
+						w.WriteHeader(cachedResp.StatusCode)
+						w.Write(cachedResp.Body)
+						return
 					}
-					w.WriteHeader(cachedResp.StatusCode)
-					w.Write(cachedResp.Body)
-					return
 				}
 
 				// Forward all other requests to the proxy
