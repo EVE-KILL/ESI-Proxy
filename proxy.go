@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -169,11 +168,11 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 		return resp, nil
 	}
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	// Only cache if the status code is 200 or 304
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotModified {
@@ -298,6 +297,22 @@ func main() {
 			// Add X-SLEPT-BY-PROXY header to the response
 			resp.Header.Add("X-Slept-By-Proxy", sleepTime.String())
 		}
+
+		// Compress the response using gzip
+		var compressedBody bytes.Buffer
+		gzipWriter := gzip.NewWriter(&compressedBody)
+		_, err := io.Copy(gzipWriter, resp.Body)
+		if err != nil {
+			return err
+		}
+		err = gzipWriter.Close()
+		if err != nil {
+			return err
+		}
+		resp.Body = io.NopCloser(&compressedBody)
+		resp.Header.Set("Content-Encoding", "gzip")
+		resp.ContentLength = int64(compressedBody.Len())
+		resp.Uncompressed = true
 
 		// Cache the response only if the request method is GET
 		if resp.Request.Method == http.MethodGet {
