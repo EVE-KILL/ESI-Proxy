@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
@@ -144,8 +145,14 @@ func transfer(destination io.WriteCloser, source io.ReadCloser) {
 
 var c = cache.New(5*time.Minute, 10*time.Minute)
 
+// cacheKey generates a unique key for each request based on method, path, query parameters, and Authorization header (if present).
 func cacheKey(req *http.Request) string {
-	return req.Method + ":" + req.URL.Path + "?" + req.URL.RawQuery
+	key := req.Method + ":" + req.URL.Path + "?" + req.URL.RawQuery
+	if authHeader := req.Header.Get("Authorization"); authHeader != "" {
+		key += ":" + authHeader
+	}
+	hash := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(hash[:])
 }
 
 type CachedResponse struct {
@@ -154,6 +161,7 @@ type CachedResponse struct {
 	Body       []byte
 }
 
+// cacheResponse caches the HTTP response if it's a GET request.
 func cacheResponse(resp *http.Response) (*http.Response, error) {
 	// Ensure only GET requests are cached
 	if resp.Request.Method != http.MethodGet {
@@ -195,6 +203,7 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 	return resp, nil
 }
 
+// getCachedResponse retrieves a cached response if available and the request method is GET.
 func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
 	// Only attempt to retrieve cache for GET requests
 	if req.Method != http.MethodGet {
