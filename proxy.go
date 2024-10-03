@@ -144,22 +144,22 @@ func (ps *ProxyServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Modify the response to handle compression and rate limiting.
+	// Set ModifyResponse to handle rate limiting, compression, and caching
 	ps.proxy.ModifyResponse = func(resp *http.Response) error {
 		ps.handleRateLimiting(resp)
 
 		// Compress the response
 		ps.compressResponse(w, resp)
 
-		// Cache the response if it's a GET request.
-		if r.Method == http.MethodGet && resp.StatusCode == http.StatusOK {
+		// Cache the response if it's a GET request with status 200 or 304
+		if r.Method == http.MethodGet && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotModified) {
 			ps.cacheResponse(r, resp)
 		}
 
 		return nil
 	}
 
-	// Handle errors from the proxy.
+	// Handle errors from the proxy
 	ps.proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
 		http.Error(w, "Proxy Error: "+err.Error(), http.StatusBadGateway)
 	}
@@ -233,6 +233,12 @@ func (ps *ProxyServer) compressResponse(w http.ResponseWriter, resp *http.Respon
 
 // cacheResponse caches the response for future GET requests.
 func (ps *ProxyServer) cacheResponse(req *http.Request, resp *http.Response) {
+	// Only cache responses with status 200 or 304
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotModified {
+		log.Printf("Response status %d not cacheable for %s", resp.StatusCode, req.URL.Path)
+		return
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Error reading response body for caching: %v", err)
@@ -248,7 +254,7 @@ func (ps *ProxyServer) cacheResponse(req *http.Request, resp *http.Response) {
 
 	key := generateCacheKey(req)
 	ps.cache.Set(key, cachedResp, defaultCacheExpiry)
-	log.Printf("Cached response for %s", req.URL.Path)
+	log.Printf("Cached response (status %d) for %s", resp.StatusCode, req.URL.Path)
 }
 
 // getCachedResponse retrieves a cached response if available.
@@ -256,7 +262,7 @@ func (ps *ProxyServer) getCachedResponse(req *http.Request) (*CachedResponse, bo
 	key := generateCacheKey(req)
 	if cached, found := ps.cache.Get(key); found {
 		if cachedResp, ok := cached.(*CachedResponse); ok {
-			log.Printf("Cache hit for %s", req.URL.Path)
+			log.Printf("Cache hit (status %d) for %s", cachedResp.StatusCode, req.URL.Path)
 			return cachedResp, true
 		}
 	}
