@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -18,100 +17,162 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"compress/flate"
+	"compress/gzip"
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
 	"github.com/patrickmn/go-cache"
 )
 
-const infoPageTemplate = `<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <title>EVE-Online API Proxy</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 0;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                background: url(https://esi.evetech.net/ui/background.jpg) no-repeat center center fixed;
-                -webkit-background-size: cover;
-                -moz-background-size: cover;
-                -o-background-size: cover;
-                background-size: cover;
-                background-color: black;
-            }
-            .container {
-                text-align: center;
-                background-color: rgba(255, 255, 255, 0.8);
-                padding: 20px;
-                border-radius: 10px;
-            }
-            a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            a:hover {
-                text-decoration: underline;
-            }
-        </style>
-    </head>
-    <body>
-    <div class="container">
-        <h1>Welcome to the ESI API Proxy</h1>
-        <p>This site serves as an API Proxy for EVE-Online.</p>
-        <p>For all API information, please refer to the official documentation at <a href="https://esi.evetech.net" target="_blank">https://esi.evetech.net</a></p>
-        <br/>
-        <p>In general all requests ESI can serve, this can also serve</p>
-    </div>
-    </body>
-</html>`
+const (
+	targetURLStr       = "https://esi.evetech.net/"
+	infoPagePath       = "/"
+	healthCheckPath    = "/healthz"
+	readyCheckPath     = "/readyz"
+	dialHomeURL        = "https://eve-kill.com/api/proxy/add"
+	defaultCacheExpiry = 5 * time.Minute
+	cleanupInterval    = 10 * time.Minute
+)
 
+// DialHomeResponse represents the payload sent to the dial home service.
 type DialHomeResponse struct {
 	ID    string `json:"id"`
 	URL   string `json:"url"`
 	Owner string `json:"owner"`
 }
 
-func generateName() string {
-	name := os.Getenv("ESI_PROXY_NAME")
-	if name == "" {
-		nameBytes := make([]byte, 16)
-		_, err := rand.Read(nameBytes)
-		if err != nil {
-			log.Fatal(err)
+// CachedResponse represents a cached HTTP response.
+type CachedResponse struct {
+	StatusCode int
+	Header     http.Header
+	Body       []byte
+}
+
+// RateLimiter manages rate limiting based on ESI headers.
+type RateLimiter struct {
+	mu              sync.Mutex
+	remaining       int
+	reset           int
+	lastUpdate      time.Time
+	backoffDuration time.Duration
+}
+
+// Update updates the rate limiter based on ESI headers.
+func (rl *RateLimiter) Update(remaining, reset int) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.remaining = remaining
+	rl.reset = reset
+	rl.lastUpdate = time.Now()
+	if rl.remaining < 100 {
+		maxSleepTime := time.Duration(rl.reset) * time.Second
+		inverseFactor := float64(100-rl.remaining) / 100
+		rl.backoffDuration = time.Duration(inverseFactor * inverseFactor * float64(maxSleepTime))
+		if rl.backoffDuration < time.Millisecond {
+			rl.backoffDuration = time.Millisecond
 		}
-		name = hex.EncodeToString(nameBytes)
 	}
-	return name
 }
 
-func dialHome(externalAddress string) {
-	dialHomeURL := "https://eve-kill.com/api/proxy/add"
-
-	data := DialHomeResponse{
-		ID:    generateName(),
-		URL:   externalAddress,
-		Owner: os.Getenv("OWNER"),
-	}
-
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	resp, err := http.Post(dialHomeURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	log.Printf("DialHomeDevice response: %s", resp.Status)
+// ShouldBackoff determines if the proxy should back off based on rate limits.
+func (rl *RateLimiter) ShouldBackoff() time.Duration {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	return rl.backoffDuration
 }
 
-func handleConnect(w http.ResponseWriter, r *http.Request) {
+// ProxyServer represents the API proxy server.
+type ProxyServer struct {
+	proxy       *httputil.ReverseProxy
+	cache       *cache.Cache
+	rateLimiter *RateLimiter
+}
+
+// NewProxyServer initializes and returns a new ProxyServer.
+func NewProxyServer(target *url.URL) *ProxyServer {
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Customize the transport for better performance and concurrency.
+	proxy.Transport = &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 90 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   5 * time.Second,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSClientConfig:       nil,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// Set the Director function to modify the request
+	proxy.Director = func(req *http.Request) {
+		req.Host = target.Host // Set the Host to the target's host
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+	}
+
+	return &ProxyServer{
+		proxy:       proxy,
+		cache:       cache.New(defaultCacheExpiry, cleanupInterval),
+		rateLimiter: &RateLimiter{},
+	}
+}
+
+// ServeHTTP handles incoming HTTP requests.
+func (ps *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodConnect:
+		ps.handleConnect(w, r)
+	case r.URL.Path == infoPagePath && r.Method == http.MethodGet:
+		ps.serveInfoPage(w, r)
+	case r.URL.Path == healthCheckPath && r.Method == http.MethodGet:
+		ps.serveHealthCheck(w, r)
+	case r.URL.Path == readyCheckPath && r.Method == http.MethodGet:
+		ps.serveReadyCheck(w, r)
+	default:
+		ps.handleProxy(w, r)
+	}
+}
+
+// handleProxy handles the proxying of requests with caching and compression.
+func (ps *ProxyServer) handleProxy(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		if cachedResp, found := ps.getCachedResponse(r); found {
+			ps.writeCachedResponse(w, cachedResp)
+			return
+		}
+	}
+
+	// Modify the response to handle compression and rate limiting.
+	ps.proxy.ModifyResponse = func(resp *http.Response) error {
+		ps.handleRateLimiting(resp)
+
+		// Compress the response
+		ps.compressResponse(w, resp)
+
+		// Cache the response if it's a GET request.
+		if r.Method == http.MethodGet && resp.StatusCode == http.StatusOK {
+			ps.cacheResponse(r, resp)
+		}
+
+		return nil
+	}
+
+	// Handle errors from the proxy.
+	ps.proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
+		http.Error(w, "Proxy Error: "+err.Error(), http.StatusBadGateway)
+	}
+
+	ps.proxy.ServeHTTP(w, r)
+}
+
+// handleConnect handles HTTP CONNECT method for tunneling.
+func (ps *ProxyServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 	destConn, err := net.Dial("tcp", r.Host)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
@@ -119,271 +180,264 @@ func handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	defer destConn.Close()
 
-	w.WriteHeader(http.StatusOK)
-	hijacker, ok := w.(http.Hijacker)
+	hj, ok := w.(http.Hijacker)
 	if !ok {
 		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
 		return
 	}
-	clientConn, _, err := hijacker.Hijack()
+	clientConn, _, err := hj.Hijack()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 	defer clientConn.Close()
 
+	clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 	go transfer(destConn, clientConn)
 	go transfer(clientConn, destConn)
 }
 
-func transfer(destination io.WriteCloser, source io.ReadCloser) {
-	defer destination.Close()
-	defer source.Close()
-	io.Copy(destination, source)
+// serveInfoPage serves the informational HTML page.
+func (ps *ProxyServer) serveInfoPage(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprint(w, infoPageTemplate)
 }
 
-var c = cache.New(5*time.Minute, 10*time.Minute)
+// serveHealthCheck responds with a simple "ok".
+func (ps *ProxyServer) serveHealthCheck(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+}
 
-// cacheKey generates a unique key for each request based on method, path, query parameters, and Authorization header (if present).
-func cacheKey(req *http.Request) string {
-	key := req.Method + ":" + req.URL.Path + "?" + req.URL.RawQuery
-	if authHeader := req.Header.Get("Authorization"); authHeader != "" {
-		key += ":" + authHeader
+// serveReadyCheck responds with a simple "ok".
+func (ps *ProxyServer) serveReadyCheck(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+}
+
+// handleRateLimiting updates and enforces rate limiting based on ESI headers.
+func (ps *ProxyServer) handleRateLimiting(resp *http.Response) {
+	remaining, _ := strconv.Atoi(resp.Header.Get("X-Esi-Error-Limit-Remain"))
+	reset, _ := strconv.Atoi(resp.Header.Get("X-Esi-Error-Limit-Reset"))
+	log.Printf("Rate limit remaining: %d, reset: %d", remaining, reset)
+	ps.rateLimiter.Update(remaining, reset)
+
+	if remaining < 100 {
+		sleepDuration := ps.rateLimiter.ShouldBackoff()
+		log.Printf("Rate limit exceeded. Sleeping for %s", sleepDuration)
+		time.Sleep(sleepDuration)
+		resp.Header.Add("X-Slept-By-Proxy", sleepDuration.String())
 	}
-	hash := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(hash[:])
 }
 
-type CachedResponse struct {
-	StatusCode int
-	Header     http.Header
-	Body       []byte
-}
+// compressResponse compresses the response based on the client's Accept-Encoding.
+func (ps *ProxyServer) compressResponse(w http.ResponseWriter, resp *http.Response) {
+	ae := resp.Request.Header.Get("Accept-Encoding")
+	var writer io.Writer = w
 
-// cacheResponse caches the HTTP response if it's a GET request.
-func cacheResponse(resp *http.Response) (*http.Response, error) {
-	// Ensure only GET requests are cached
-	if resp.Request.Method != http.MethodGet {
-		return resp, nil
+	switch {
+	case strings.Contains(ae, "gzip"):
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		writer = gz
+	case strings.Contains(ae, "deflate"):
+		w.Header().Set("Content-Encoding", "deflate")
+		deflateWriter, _ := flate.NewWriter(w, flate.DefaultCompression)
+		defer deflateWriter.Close()
+		writer = deflateWriter
+	case strings.Contains(ae, "br"):
+		w.Header().Set("Content-Encoding", "br")
+		brWriter := brotli.NewWriter(w)
+		defer brWriter.Close()
+		writer = brWriter
+	case strings.Contains(ae, "zstd"):
+		w.Header().Set("Content-Encoding", "zstd")
+		zstdWriter, _ := zstd.NewWriter(w)
+		defer zstdWriter.Close()
+		writer = zstdWriter
 	}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	// Copy the response body to the writer (which may be compressed)
+	if _, err := io.Copy(writer, resp.Body); err != nil {
+		log.Printf("Failed to copy response body: %v", err)
+	}
+}
+
+// cacheResponse caches the response for future GET requests.
+func (ps *ProxyServer) cacheResponse(req *http.Request, resp *http.Response) {
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		log.Printf("Error reading response body for caching: %v", err)
+		return
 	}
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	// Only cache if the status code is 200 or 304
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotModified {
-		return resp, nil
-	}
-
-	cacheDuration := 5 * time.Minute
-	if cacheControl := resp.Header.Get("Cache-Control"); cacheControl != "" {
-		if maxAgeIndex := strings.Index(cacheControl, "max-age="); maxAgeIndex != -1 {
-			maxAgeStr := cacheControl[maxAgeIndex+8:]
-			if commaIndex := strings.Index(maxAgeStr, ","); commaIndex != -1 {
-				maxAgeStr = maxAgeStr[:commaIndex]
-			}
-			if maxAge, err := strconv.Atoi(maxAgeStr); err == nil {
-				cacheDuration = time.Duration(maxAge) * time.Second
-			}
-		}
-	}
+	resp.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	cachedResp := &CachedResponse{
 		StatusCode: resp.StatusCode,
-		Header:     resp.Header,
-		Body:       bodyBytes,
+		Header:     resp.Header.Clone(),
+		Body:       body,
 	}
 
-	c.Set(cacheKey(resp.Request), cachedResp, cacheDuration)
-	log.Printf("Cached response for %s", resp.Request.URL.Path)
-	return resp, nil
+	key := generateCacheKey(req)
+	ps.cache.Set(key, cachedResp, defaultCacheExpiry)
+	log.Printf("Cached response for %s", req.URL.Path)
 }
 
-// getCachedResponse retrieves a cached response if available and the request method is GET.
-func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
-	// Only attempt to retrieve cache for GET requests
-	if req.Method != http.MethodGet {
-		return nil, false
-	}
-
-	if cachedResp, found := c.Get(cacheKey(req)); found {
-		if resp, ok := cachedResp.(*CachedResponse); ok {
+// getCachedResponse retrieves a cached response if available.
+func (ps *ProxyServer) getCachedResponse(req *http.Request) (*CachedResponse, bool) {
+	key := generateCacheKey(req)
+	if cached, found := ps.cache.Get(key); found {
+		if cachedResp, ok := cached.(*CachedResponse); ok {
 			log.Printf("Cache hit for %s", req.URL.Path)
-			return resp, true
+			return cachedResp, true
 		}
 	}
 	log.Printf("Cache miss for %s", req.URL.Path)
 	return nil, false
 }
 
+// writeCachedResponse writes the cached response to the client.
+func (ps *ProxyServer) writeCachedResponse(w http.ResponseWriter, cachedResp *CachedResponse) {
+	for k, values := range cachedResp.Header {
+		for _, v := range values {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(cachedResp.StatusCode)
+	w.Write(cachedResp.Body)
+}
+
+// generateCacheKey creates a unique cache key based on the request.
+func generateCacheKey(req *http.Request) string {
+	key := fmt.Sprintf("%s:%s?%s", req.Method, req.URL.Path, req.URL.RawQuery)
+	if auth := req.Header.Get("Authorization"); auth != "" {
+		key += ":" + auth
+	}
+	hash := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(hash[:])
+}
+
+// dialHome registers the proxy with the dial home service.
+func dialHome(externalAddress string, name string, owner string) {
+	data := DialHomeResponse{
+		ID:    name,
+		URL:   externalAddress,
+		Owner: owner,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Failed to marshal dial home data: %v", err)
+	}
+
+	resp, err := http.Post(dialHomeURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Fatalf("DialHome POST request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	log.Printf("DialHome response: %s", resp.Status)
+}
+
+// generateName generates a unique name for the proxy.
+func generateName() string {
+	name := os.Getenv("ESI_PROXY_NAME")
+	if name == "" {
+		nameBytes := make([]byte, 16)
+		if _, err := rand.Read(nameBytes); err != nil {
+			log.Fatalf("Failed to generate proxy name: %v", err)
+		}
+		name = hex.EncodeToString(nameBytes)
+	}
+	return name
+}
+
+// transfer copies data between source and destination.
+func transfer(destination io.WriteCloser, source io.ReadCloser) {
+	defer destination.Close()
+	defer source.Close()
+	io.Copy(destination, source)
+}
+
 func main() {
-	// Define command-line flags
+	// Command-line flags
 	host := flag.String("host", "localhost", "Host to listen on")
-	httpPort := flag.String("port", "9501", "HTTP port to listen on")
+	port := flag.String("port", "9501", "Port to listen on")
 	flag.Parse()
 
-	targetURL, err := url.Parse("https://esi.evetech.net/")
+	targetURL, err := url.Parse(targetURLStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to parse target URL: %v", err)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	proxyServer := NewProxyServer(targetURL)
 
-	// Configure http/2 and keep-alive for the proxy transport
-	proxy.Transport = &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   5 * time.Second,
-			KeepAlive: 90 * time.Second,
-		}).DialContext,
-		TLSHandshakeTimeout: 5 * time.Second,
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 100,
-		IdleConnTimeout:     90 * time.Second,
-	}
-
-	// Create a custom Director to modify the request
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		req.Host = targetURL.Host
-		req.URL.Scheme = targetURL.Scheme
-		req.URL.Host = targetURL.Host
-		req.URL.Path = singleJoiningSlash(targetURL.Path, req.URL.Path)
-		log.Printf("Request from %s to %s", req.RemoteAddr, req.URL.Path)
-	}
-
-	// Create a custom ModifyResponse function to log response details and perform rate limiting
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		// Enable Gzip compression
-		if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
-			resp.Body, err = gzip.NewReader(resp.Body)
-			if err != nil {
-				return err
-			}
-		}
-
-		esiErrorLimitRemaining := 100
-		esiErrorLimitReset := 0
-
-		if remainingHeader := resp.Header.Get("X-Esi-Error-Limit-Remain"); remainingHeader != "" {
-			esiErrorLimitRemaining, _ = strconv.Atoi(remainingHeader)
-		}
-
-		if resetHeader := resp.Header.Get("X-Esi-Error-Limit-Reset"); resetHeader != "" {
-			esiErrorLimitReset, _ = strconv.Atoi(resetHeader)
-		}
-
-		log.Printf("Response size: %d bytes", resp.ContentLength)
-
-		if esiErrorLimitRemaining < 100 {
-			log.Printf("ESI Error Limit Remaining: %d", esiErrorLimitRemaining)
-			log.Printf("ESI Error Limit Reset: %d", esiErrorLimitReset)
-
-			maxSleepTime := time.Duration(esiErrorLimitReset) * time.Second
-			inverseFactor := float64(100-esiErrorLimitRemaining) / 100
-			sleepTime := time.Duration(inverseFactor * inverseFactor * float64(maxSleepTime))
-
-			if sleepTime < time.Millisecond {
-				sleepTime = time.Millisecond
-			}
-
-			log.Printf("Sleeping for %s", sleepTime)
-			time.Sleep(sleepTime)
-
-			// Add X-SLEPT-BY-PROXY header to the response
-			resp.Header.Add("X-Slept-By-Proxy", sleepTime.String())
-		}
-
-		// Cache the response only if the request method is GET
-		if resp.Request.Method == http.MethodGet {
-			_, err := cacheResponse(resp)
-			if err != nil {
-				log.Printf("Error caching response: %v", err)
-			}
-		}
-
-		return nil
-	}
-
-	// Dial home if enabled
-	dialHomeEnv := os.Getenv("DIAL_HOME")
-	externalAddress := os.Getenv("EXTERNAL_ADDRESS")
-
-	if strings.EqualFold(dialHomeEnv, "true") || dialHomeEnv == "1" {
+	// Register dial home if enabled
+	if strings.EqualFold(os.Getenv("DIAL_HOME"), "true") || os.Getenv("DIAL_HOME") == "1" {
+		externalAddress := os.Getenv("EXTERNAL_ADDRESS")
+		owner := os.Getenv("OWNER")
 		if externalAddress != "" {
-			go dialHome(externalAddress)
+			go dialHome(externalAddress, generateName(), owner)
 		} else {
 			log.Println("EXTERNAL_ADDRESS not set, skipping dial home")
 		}
 	}
 
-	// Set timeouts for the HTTP server
 	server := &http.Server{
-		Addr: fmt.Sprintf("%s:%s", *host, *httpPort),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodConnect {
-				handleConnect(w, r)
-			} else if r.Method == http.MethodGet && r.URL.Path == "/" {
-				// Serve the information page for GET requests on the root path
-				fmt.Fprint(w, infoPageTemplate)
-			} else if r.URL.Path == "/healthz" {
-				healthzHandler(w, r)
-			} else if r.URL.Path == "/readyz" {
-				readyzHandler(w, r)
-			} else {
-				// Only cache GET requests
-				if r.Method == http.MethodGet {
-					// Check cache before forwarding the request
-					if cachedResp, found := getCachedResponse(r); found {
-						for k, v := range cachedResp.Header {
-							for _, vv := range v {
-								w.Header().Add(k, vv)
-							}
-						}
-						w.WriteHeader(cachedResp.StatusCode)
-						w.Write(cachedResp.Body)
-						return
-					}
-				}
-
-				// Forward all other requests to the proxy
-				proxy.ServeHTTP(w, r)
-			}
-		}),
+		Addr:         fmt.Sprintf("%s:%s", *host, *port),
+		Handler:      proxyServer,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
 	log.Printf("Proxy server is running on http://%s", server.Addr)
-
-	// Start HTTP server
-	log.Fatal(server.ListenAndServe())
-}
-
-// singleJoiningSlash is a helper function to join URL paths
-func singleJoiningSlash(a, b string) string {
-	aslash := strings.HasSuffix(a, "/")
-	bslash := strings.HasPrefix(b, "/")
-	switch {
-	case aslash && bslash:
-		return a + b[1:]
-	case !aslash && !bslash:
-		return a + "/" + b
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("Server failed: %v", err)
 	}
-	return a + b
 }
 
-// Health check endpoints
-func healthzHandler(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
-}
-
-func readyzHandler(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
-}
+// infoPageTemplate is the HTML template for the information page.
+const infoPageTemplate = `<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>EVE-Online API Proxy</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				height: 100vh;
+				background: url(https://esi.evetech.net/ui/background.jpg) no-repeat center center fixed;
+				background-size: cover;
+				background-color: black;
+			}
+			.container {
+				text-align: center;
+				background-color: rgba(255, 255, 255, 0.8);
+				padding: 20px;
+				border-radius: 10px;
+			}
+			a {
+				color: #0066cc;
+				text-decoration: none;
+			}
+			a:hover {
+				text-decoration: underline;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>Welcome to the ESI API Proxy</h1>
+			<p>This site serves as an API Proxy for EVE-Online.</p>
+			<p>For all API information, please refer to the official documentation at <a href="https://esi.evetech.net" target="_blank">https://esi.evetech.net</a></p>
+			<br/>
+			<p>In general all requests ESI can serve, this can also serve</p>
+		</div>
+	</body>
+</html>`
