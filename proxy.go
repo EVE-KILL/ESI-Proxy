@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
-	"golang.org/x/net/http2"
 )
 
 const infoPageTemplate = `<!DOCTYPE html>
@@ -233,17 +232,17 @@ func main() {
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
-	// Enable HTTP/2
-	proxy.Transport = &http2.Transport{
-		AllowHTTP: true,
+	// Configure http/2 and keep-alive for the proxy transport
+	proxy.Transport = &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 90 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
 	}
-
-	client := &http.Client{
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-		},
-	}
-	proxy.Transport = client.Transport
 
 	// Create a custom Director to modify the request
 	originalDirector := proxy.Director
@@ -297,22 +296,6 @@ func main() {
 			// Add X-SLEPT-BY-PROXY header to the response
 			resp.Header.Add("X-Slept-By-Proxy", sleepTime.String())
 		}
-
-		// Compress the response using gzip
-		var compressedBody bytes.Buffer
-		gzipWriter := gzip.NewWriter(&compressedBody)
-		_, err := io.Copy(gzipWriter, resp.Body)
-		if err != nil {
-			return err
-		}
-		err = gzipWriter.Close()
-		if err != nil {
-			return err
-		}
-		resp.Body = io.NopCloser(&compressedBody)
-		resp.Header.Set("Content-Encoding", "gzip")
-		resp.ContentLength = int64(compressedBody.Len())
-		resp.Uncompressed = true
 
 		// Cache the response only if the request method is GET
 		if resp.Request.Method == http.MethodGet {
