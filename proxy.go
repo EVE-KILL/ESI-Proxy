@@ -279,10 +279,11 @@ func main() {
 		}
 
 		log.Printf("Response size: %d bytes", resp.ContentLength)
-		log.Printf("ESI Error Limit Remaining: %d", esiErrorLimitRemaining)
-		log.Printf("ESI Error Limit Reset: %d", esiErrorLimitReset)
 
 		if esiErrorLimitRemaining < 100 {
+			log.Printf("ESI Error Limit Remaining: %d", esiErrorLimitRemaining)
+			log.Printf("ESI Error Limit Reset: %d", esiErrorLimitReset)
+
 			maxSleepTime := time.Duration(esiErrorLimitReset) * time.Second
 			inverseFactor := float64(100-esiErrorLimitRemaining) / 100
 			sleepTime := time.Duration(inverseFactor * inverseFactor * float64(maxSleepTime))
