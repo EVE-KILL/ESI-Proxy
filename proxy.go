@@ -292,6 +292,9 @@ func main() {
 
 			log.Printf("Sleeping for %s", sleepTime)
 			time.Sleep(sleepTime)
+
+			// Add X-SLEPT-BY-PROXY header to the response
+			resp.Header.Add("X-Slept-By-Proxy", sleepTime.String())
 		}
 
 		// Cache the response only if the request method is GET
