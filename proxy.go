@@ -20,10 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"compress/flate"
-	"compress/gzip"
-	"github.com/andybalholm/brotli"
-	"github.com/klauspost/compress/zstd"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -230,38 +226,9 @@ func (ps *ProxyServer) handleRateLimiting(resp *http.Response) {
 	}
 }
 
-// compressResponse compresses the response based on the client's Accept-Encoding.
+// compressResponse is now a no-op function.
 func (ps *ProxyServer) compressResponse(w http.ResponseWriter, resp *http.Response) {
-	ae := resp.Request.Header.Get("Accept-Encoding")
-	var writer io.Writer = w
-
-	switch {
-	case strings.Contains(ae, "gzip"):
-		w.Header().Set("Content-Encoding", "gzip")
-		gz := gzip.NewWriter(w)
-		defer gz.Close()
-		writer = gz
-	case strings.Contains(ae, "deflate"):
-		w.Header().Set("Content-Encoding", "deflate")
-		deflateWriter, _ := flate.NewWriter(w, flate.DefaultCompression)
-		defer deflateWriter.Close()
-		writer = deflateWriter
-	case strings.Contains(ae, "br"):
-		w.Header().Set("Content-Encoding", "br")
-		brWriter := brotli.NewWriter(w)
-		defer brWriter.Close()
-		writer = brWriter
-	case strings.Contains(ae, "zstd"):
-		w.Header().Set("Content-Encoding", "zstd")
-		zstdWriter, _ := zstd.NewWriter(w)
-		defer zstdWriter.Close()
-		writer = zstdWriter
-	}
-
-	// Copy the response body to the writer (which may be compressed)
-	if _, err := io.Copy(writer, resp.Body); err != nil {
-		log.Printf("Failed to copy response body: %v", err)
-	}
+	// No compression applied, simply return the response as is.
 }
 
 // cacheResponse caches the response for future GET requests.
