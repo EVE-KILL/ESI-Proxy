@@ -2,15 +2,13 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"crypto/sha256"
-	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/patrickmn/go-cache"
-	"golang.org/x/net/http2"
 	"io"
 	"io/ioutil"
 	"log"
@@ -22,6 +20,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/patrickmn/go-cache"
+	"golang.org/x/net/http2"
 )
 
 const infoPageTemplate = `<!DOCTYPE html>
@@ -199,7 +200,7 @@ func cacheResponse(resp *http.Response) (*http.Response, error) {
 	}
 
 	c.Set(cacheKey(resp.Request), cachedResp, cacheDuration)
-	log.Printf("Cached response for %s", cacheKey(resp.Request))
+	log.Printf("Cached response for %s", resp.Request.URL.Path)
 	return resp, nil
 }
 
@@ -212,11 +213,11 @@ func getCachedResponse(req *http.Request) (*CachedResponse, bool) {
 
 	if cachedResp, found := c.Get(cacheKey(req)); found {
 		if resp, ok := cachedResp.(*CachedResponse); ok {
-			log.Printf("Cache hit for %s", cacheKey(req))
+			log.Printf("Cache hit for %s", req.URL.Path)
 			return resp, true
 		}
 	}
-	log.Printf("Cache miss for %s", cacheKey(req))
+	log.Printf("Cache miss for %s", req.URL.Path)
 	return nil, false
 }
 
