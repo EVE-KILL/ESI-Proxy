@@ -151,7 +151,7 @@ func (ps *ProxyServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 		// Compress the response
 		ps.compressResponse(w, resp)
 
-		// Cache the response if it's a GET request with status 200 or 304
+		// Cache the response only if it's a GET request with status 200 or 304
 		if r.Method == http.MethodGet && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotModified) {
 			ps.cacheResponse(r, resp)
 		}
@@ -235,7 +235,7 @@ func (ps *ProxyServer) compressResponse(w http.ResponseWriter, resp *http.Respon
 func (ps *ProxyServer) cacheResponse(req *http.Request, resp *http.Response) {
 	// Only cache responses with status 200 or 304
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotModified {
-		log.Printf("Response status %d not cacheable for %s", resp.StatusCode, req.URL.Path)
+		log.Printf("Response status %d not cacheable for %s", resp.StatusCode, req.URL.String())
 		return
 	}
 
@@ -254,7 +254,7 @@ func (ps *ProxyServer) cacheResponse(req *http.Request, resp *http.Response) {
 
 	key := generateCacheKey(req)
 	ps.cache.Set(key, cachedResp, defaultCacheExpiry)
-	log.Printf("Cached response (status %d) for %s", resp.StatusCode, req.URL.Path)
+	log.Printf("Cached response (status %d) for %s with key %s", resp.StatusCode, req.URL.String(), key)
 }
 
 // getCachedResponse retrieves a cached response if available.
@@ -262,31 +262,64 @@ func (ps *ProxyServer) getCachedResponse(req *http.Request) (*CachedResponse, bo
 	key := generateCacheKey(req)
 	if cached, found := ps.cache.Get(key); found {
 		if cachedResp, ok := cached.(*CachedResponse); ok {
-			log.Printf("Cache hit (status %d) for %s", cachedResp.StatusCode, req.URL.Path)
+			log.Printf("Cache hit (status %d) for %s with key %s", cachedResp.StatusCode, req.URL.String(), key)
 			return cachedResp, true
 		}
+		log.Printf("Cache entry found but type assertion failed for key %s", key)
 	}
-	log.Printf("Cache miss for %s", req.URL.Path)
+	log.Printf("Cache miss for %s with key %s", req.URL.String(), key)
 	return nil, false
 }
 
 // writeCachedResponse writes the cached response to the client.
 func (ps *ProxyServer) writeCachedResponse(w http.ResponseWriter, cachedResp *CachedResponse) {
+	// Validate Content-Type before serving
+	contentType := cachedResp.Header.Get("Content-Type")
+	if !isValidContentType(contentType) {
+		log.Printf("Invalid Content-Type '%s' for cached response, skipping cache", contentType)
+		return
+	}
+
 	for k, values := range cachedResp.Header {
 		for _, v := range values {
 			w.Header().Add(k, v)
 		}
 	}
 	w.WriteHeader(cachedResp.StatusCode)
-	w.Write(cachedResp.Body)
+	_, err := w.Write(cachedResp.Body)
+	if err != nil {
+		log.Printf("Error writing cached response body: %v", err)
+	}
+}
+
+// isValidContentType validates the Content-Type of the cached response
+func isValidContentType(contentType string) bool {
+	validTypes := []string{
+		"application/json",
+	}
+
+	for _, vt := range validTypes {
+		if strings.Contains(contentType, vt) {
+			return true
+		}
+	}
+	return false
 }
 
 // generateCacheKey creates a unique cache key based on the request.
 func generateCacheKey(req *http.Request) string {
-	key := fmt.Sprintf("%s:%s?%s", req.Method, req.URL.Path, req.URL.RawQuery)
-	if auth := req.Header.Get("Authorization"); auth != "" {
-		key += ":" + auth
+	// Include the scheme and host to ensure uniqueness across different hosts
+	key := fmt.Sprintf("%s://%s%s?%s", req.URL.Scheme, req.Host, req.URL.Path, req.URL.RawQuery)
+
+	// Incorporate relevant headers that might affect the response
+	relevantHeaders := []string{"Authorization", "Accept", "Accept-Encoding"}
+	for _, header := range relevantHeaders {
+		if value := req.Header.Get(header); value != "" {
+			key += fmt.Sprintf(":%s=%s", header, value)
+		}
 	}
+
+	// Hash the key to create a fixed-length unique identifier
 	hash := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(hash[:])
 }
@@ -364,6 +397,16 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
+	// Periodically log cache stats
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			stats := proxyServer.cache.ItemCount()
+			log.Printf("Cache currently holds %d items", stats)
+		}
+	}()
 
 	log.Printf("Proxy server is running on http://%s", server.Addr)
 	if err := server.ListenAndServe(); err != nil {
