@@ -80,9 +80,6 @@ func StartServer() {
 		proxy.RequestHandler(proxy.NewProxy(req.Request.URL), req.Request.URL, "/", rateLimiter, cache, requestQueue)(req.ResponseWriter, req.Request)
 	})
 
-	// Dial home
-	go helpers.DialHome()
-
 	// Start server
 	host := helpers.GetEnv("HOST", "0.0.0.0")
 	port := helpers.GetEnv("PORT", "8080")
