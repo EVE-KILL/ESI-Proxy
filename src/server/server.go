@@ -30,6 +30,13 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 		http.NotFound(w, r)
 	})
 
+	// Handle robots.txt
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("User-agent: *\nDisallow: /"))
+	})
+
 	// Set up proxy for all other routes
 	upstreamURL, err := url.Parse("https://esi.evetech.net/")
 	if err != nil {
