@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"time"
 
 	"github.com/eve-kill/esi-proxy/endpoints"
 	"github.com/eve-kill/esi-proxy/helpers"
@@ -16,7 +15,7 @@ func Test() {
 	log.Println("Starting proxy server")
 }
 
-func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.Cache, *helpers.RequestQueue) {
+func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.RequestQueue) {
 	// Create new router
 	mux := http.NewServeMux()
 
@@ -48,9 +47,6 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 	// Initialize the RateLimiter with default values
 	rateLimiter := helpers.NewRateLimiter()
 
-	// Initialize the Cache
-	cache := helpers.NewCache(5*time.Minute, 1*time.Hour)
-
 	// Initialize the Request Queue
 	requestQueue := helpers.NewRequestQueue() // Adjust size as needed
 
@@ -61,14 +57,14 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 			return
 		}
 		// Otherwise, handle it with the proxy
-		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache, requestQueue)(w, r)
+		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, requestQueue)(w, r)
 	}))
 
-	return mux, proxyHandler, rateLimiter, cache, requestQueue
+	return mux, proxyHandler, rateLimiter, requestQueue
 }
 
 func StartServer() {
-	mux, _, _, _, requestQueue := setupServer()
+	mux, _, _, requestQueue := setupServer()
 
 	// Start processing the request queue
 	go requestQueue.ProcessQueue(func(req helpers.QueuedRequest) {
