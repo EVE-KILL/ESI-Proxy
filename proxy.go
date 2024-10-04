@@ -49,11 +49,11 @@ type CachedResponse struct {
 
 // RateLimiter manages rate limiting based on ESI headers.
 type RateLimiter struct {
-	mu              sync.Mutex
-	remaining       int
-	reset           int
-	lastUpdate      time.Time
-	backoffDuration time.Duration
+	mu           sync.Mutex
+	remaining    int
+	reset        int
+	lastUpdate   time.Time
+	backoffUntil time.Time
 }
 
 // Update updates the rate limiter based on ESI headers.
@@ -66,10 +66,7 @@ func (rl *RateLimiter) Update(remaining, reset int) {
 	if rl.remaining < 100 {
 		maxSleepTime := time.Duration(rl.reset) * time.Second
 		inverseFactor := float64(100-rl.remaining) / 100
-		rl.backoffDuration = time.Duration(inverseFactor * inverseFactor * float64(maxSleepTime))
-		if rl.backoffDuration < time.Millisecond {
-			rl.backoffDuration = time.Millisecond
-		}
+		rl.backoffUntil = time.Now().Add(time.Duration(inverseFactor * inverseFactor * float64(maxSleepTime)))
 	}
 }
 
@@ -77,14 +74,19 @@ func (rl *RateLimiter) Update(remaining, reset int) {
 func (rl *RateLimiter) ShouldBackoff() time.Duration {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	return rl.backoffDuration
+	if rl.backoffUntil.After(time.Now()) {
+		return rl.backoffUntil.Sub(time.Now())
+	}
+	return 0
 }
 
 // ProxyServer represents the API proxy server.
 type ProxyServer struct {
-	proxy       *httputil.ReverseProxy
-	cache       *cache.Cache
-	rateLimiter *RateLimiter
+	proxy        *httputil.ReverseProxy
+	cache        *cache.Cache
+	rateLimiter  *RateLimiter
+	semaphore    *Semaphore
+	requestQueue *RequestQueue
 }
 
 // NewProxyServer initializes and returns a new ProxyServer.
@@ -112,11 +114,17 @@ func NewProxyServer(target *url.URL) *ProxyServer {
 		req.URL.Host = target.Host
 	}
 
-	return &ProxyServer{
-		proxy:       proxy,
-		cache:       cache.New(defaultCacheExpiry, cleanupInterval),
-		rateLimiter: &RateLimiter{},
+	ps := &ProxyServer{
+		proxy:        proxy,
+		cache:        cache.New(defaultCacheExpiry, cleanupInterval),
+		rateLimiter:  &RateLimiter{},
+		semaphore:    NewSemaphore(100),
+		requestQueue: NewRequestQueue(),
 	}
+
+	go ps.processQueue()
+
+	return ps
 }
 
 // ServeHTTP handles incoming HTTP requests.
@@ -144,27 +152,22 @@ func (ps *ProxyServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set ModifyResponse to handle rate limiting, compression, and caching
-	ps.proxy.ModifyResponse = func(resp *http.Response) error {
-		ps.handleRateLimiting(resp)
-
-		// Compress the response
-		ps.compressResponse(w, resp)
-
-		// Cache the response only if it's a GET request with status 200 or 304
-		if r.Method == http.MethodGet && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotModified) {
-			ps.cacheResponse(r, resp)
-		}
-
-		return nil
+	// Check if the proxy is in backoff
+	if ps.rateLimiter.ShouldBackoff() > 0 {
+		// Add the request to the queue
+		ps.requestQueue.Push(*r)
+		return
 	}
 
-	// Handle errors from the proxy
-	ps.proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
-		http.Error(w, "Proxy Error: "+err.Error(), http.StatusBadGateway)
+	// Attempt to acquire the semaphore
+	if !ps.semaphore.Acquire() {
+		// Semaphore is full, add the request to the queue
+		ps.requestQueue.Push(*r)
+		return
 	}
+	defer ps.semaphore.Release()
 
-	ps.proxy.ServeHTTP(w, r)
+	ps.handleRequest(w, r)
 }
 
 // handleConnect handles HTTP CONNECT method for tunneling.
@@ -215,14 +218,12 @@ func (ps *ProxyServer) serveReadyCheck(w http.ResponseWriter, _ *http.Request) {
 func (ps *ProxyServer) handleRateLimiting(resp *http.Response) {
 	remaining, _ := strconv.Atoi(resp.Header.Get("X-Esi-Error-Limit-Remain"))
 	reset, _ := strconv.Atoi(resp.Header.Get("X-Esi-Error-Limit-Reset"))
-	log.Printf("Rate limit remaining: %d, reset: %d", remaining, reset)
+	log.Printf("Rate limit remaining: %d, reset in: %d seconds", remaining, reset)
 	ps.rateLimiter.Update(remaining, reset)
 
-	if remaining < 100 {
-		sleepDuration := ps.rateLimiter.ShouldBackoff()
-		log.Printf("Rate limit exceeded. Sleeping for %s", sleepDuration)
-		time.Sleep(sleepDuration)
-		resp.Header.Add("X-Slept-By-Proxy", sleepDuration.String())
+	if ps.rateLimiter.ShouldBackoff() > 0 {
+		backoffDuration := time.Duration(reset) * time.Second
+		ps.requestQueue.SetBackoff(backoffDuration)
 	}
 }
 
@@ -366,6 +367,123 @@ func transfer(destination io.WriteCloser, source io.ReadCloser) {
 	io.Copy(destination, source)
 }
 
+type RequestQueue struct {
+	mu      sync.Mutex
+	queue   []http.Request
+	cond    *sync.Cond
+	backoff time.Time
+}
+
+func NewRequestQueue() *RequestQueue {
+	q := &RequestQueue{
+		queue: make([]http.Request, 0),
+	}
+	q.cond = sync.NewCond(&q.mu)
+	return q
+}
+
+func (q *RequestQueue) Push(req http.Request) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.queue = append(q.queue, req)
+	q.cond.Signal()
+}
+
+func (q *RequestQueue) Pop() (http.Request, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for len(q.queue) == 0 {
+		if time.Now().Before(q.backoff) {
+			q.cond.Wait()
+		} else {
+			return http.Request{}, false
+		}
+	}
+	req := q.queue[0]
+	q.queue = q.queue[1:]
+	return req, true
+}
+
+func (q *RequestQueue) SetBackoff(duration time.Duration) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.backoff = time.Now().Add(duration)
+}
+
+func (ps *ProxyServer) processQueue() {
+	for {
+		req, ok := ps.requestQueue.Pop()
+		if !ok {
+			// Backoff period ended, and queue is empty
+			continue
+		}
+
+		// Attempt to acquire the semaphore
+		if !ps.semaphore.Acquire() {
+			// Semaphore is full, push the request back to the queue
+			ps.requestQueue.Push(req)
+			continue
+		}
+
+		// Process the request
+		go func(req http.Request) {
+			defer ps.semaphore.Release()
+			ps.handleRequest(nil, &req)
+		}(req)
+	}
+}
+
+func (ps *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
+	// Set ModifyResponse to handle rate limiting, compression, and caching
+	ps.proxy.ModifyResponse = func(resp *http.Response) error {
+		ps.handleRateLimiting(resp)
+
+		// Compress the response
+		ps.compressResponse(w, resp)
+
+		// Cache the response if it's a GET request with status 200 or 304
+		if r.Method == http.MethodGet && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotModified) {
+			ps.cacheResponse(r, resp)
+		}
+
+		return nil
+	}
+
+	// Handle errors from the proxy
+	ps.proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
+		http.Error(w, "Proxy Error: "+err.Error(), http.StatusBadGateway)
+	}
+
+	ps.proxy.ServeHTTP(w, r)
+}
+
+type Semaphore struct {
+	ch chan struct{}
+}
+
+func NewSemaphore(capacity int) *Semaphore {
+	return &Semaphore{
+		ch: make(chan struct{}, capacity),
+	}
+}
+
+func (s *Semaphore) Acquire() bool {
+	select {
+	case s.ch <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Semaphore) Release() {
+	select {
+	case <-s.ch:
+	default:
+		// No-op if the semaphore is already released.
+	}
+}
+
 func main() {
 	// Command-line flags
 	host := flag.String("host", "localhost", "Host to listen on")
@@ -391,11 +509,12 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%s", *host, *port),
-		Handler:      proxyServer,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:           fmt.Sprintf("%s:%s", *host, *port),
+		Handler:        proxyServer,
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   15 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	// Periodically log cache stats
