@@ -81,8 +81,22 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		rc := &responseCapture{ResponseWriter: w, headers: make(http.Header)}
 		proxy.ServeHTTP(rc, r)
 
-		// Cache the response if it's a 200 OK or 304 Not Modified and the request method is GET
-		if r.Method == http.MethodGet && (rc.status == http.StatusOK || rc.status == http.StatusNotModified) {
+		// Convert 304 Not Modified to 200 OK
+		//if rc.status == http.StatusNotModified {
+		//	rc.status = http.StatusOK
+		//}
+
+		// Write the status and headers to the response
+		w.WriteHeader(rc.status)
+		for key, values := range rc.headers {
+			for _, value := range values {
+				w.Header().Add(key, value)
+			}
+		}
+		w.Write(rc.body)
+
+		// Cache the response if it's a 200 OK and the request method is GET
+		if r.Method == http.MethodGet && rc.status == http.StatusOK {
 			dateHeader := rc.headers.Get("Date")
 			expiresHeader := rc.headers.Get("Expires")
 			if dateHeader != "" && expiresHeader != "" {
