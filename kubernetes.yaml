@@ -25,27 +25,6 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 9501
-        env:
-        - name: OWNER
-          valueFrom:
-            configMapKeyRef:
-              name: esi-proxy-config
-              key: OWNER
-        - name: DIAL_HOME
-          valueFrom:
-            configMapKeyRef:
-              name: esi-proxy-config
-              key: DIAL_HOME
-        - name: EXTERNAL_ADDRESS
-          valueFrom:
-            configMapKeyRef:
-              name: esi-proxy-config
-              key: EXTERNAL_ADDRESS
-        - name: ESI_PROXY_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: esi-proxy-config
-              key: ESI_PROXY_NAME
         resources:
           requests:
             memory: "256Mi"
@@ -71,17 +50,6 @@ spec:
     rollingUpdate:
       maxUnavailable: 1
       maxSurge: 1
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: esi-proxy-config
-data:
-  OWNER: "your_owner_value"
-  DIAL_HOME: "your_dial_home_value"
-  EXTERNAL_ADDRESS: "your_external_address_value"
-  ESI_PROXY_NAME: "your_esi_proxy_name_value"
 
 ---
 apiVersion: v1

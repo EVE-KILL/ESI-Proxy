@@ -5,11 +5,6 @@ services:
     image: ghcr.io/eve-kill/esi-proxy:latest
     ports:
       - "9501:9501"
-    environment:
-      - OWNER=${OWNER}
-      - DIAL_HOME=${DIAL_HOME}
-      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
-      - ESI_PROXY_NAME=${ESI_PROXY_NAME}
     networks:
       - proxy
 
