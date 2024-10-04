@@ -16,7 +16,7 @@ func Test() {
 	log.Println("Starting proxy server")
 }
 
-func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.RequestQueue, *helpers.Cache) {
+func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.Cache) {
 	// Create new router
 	mux := http.NewServeMux()
 
@@ -48,9 +48,6 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 	// Initialize the RateLimiter with default values
 	rateLimiter := helpers.NewRateLimiter()
 
-	// Initialize the Request Queue
-	requestQueue := helpers.NewRequestQueue() // Adjust size as needed
-
 	// Initialize the Cache
 	cache := helpers.NewCache(1*time.Hour, 1*time.Hour)
 
@@ -61,30 +58,14 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 			return
 		}
 		// Otherwise, handle it with the proxy
-		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache, requestQueue)(w, r)
+		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache)(w, r)
 	}))
 
-	return mux, proxyHandler, rateLimiter, requestQueue, cache
+	return mux, proxyHandler, rateLimiter, cache
 }
 
 func StartServer() {
-	mux, proxyHandler, rateLimiter, requestQueue, cache := setupServer()
-
-	// Retrieve the upstreamURL used in setupServer
-	upstreamURL, err := url.Parse("https://esi.evetech.net/")
-	if err != nil {
-		log.Fatalf("Error parsing upstream URL: %v", err)
-	}
-
-	// Start processing the request queue
-	go requestQueue.ProcessQueue(func(req helpers.QueuedRequest) {
-		// Wait until the rate limiter allows processing
-		for rateLimiter.ShouldBackoff() > 0 {
-			time.Sleep(time.Second)
-		}
-		// Process the request using existing proxyHandler and upstreamURL
-		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache, requestQueue)(req.ResponseWriter, req.Request)
-	})
+	mux, _, _, _ := setupServer()
 
 	// Start server
 	host := helpers.GetEnv("HOST", "0.0.0.0")

@@ -46,7 +46,7 @@ func (rc *responseCapture) WriteHeader(statusCode int) {
 	rc.headers = rc.ResponseWriter.Header().Clone()
 }
 
-func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string, rateLimiter *helpers.RateLimiter, cache *helpers.Cache, requestQueue *helpers.RequestQueue) func(http.ResponseWriter, *http.Request) {
+func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string, rateLimiter *helpers.RateLimiter, cache *helpers.Cache) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cacheKey := helpers.GenerateCacheKey(r.URL.String(), r.Header.Get("Authorization"))
 		if r.Method == http.MethodGet {
@@ -64,11 +64,6 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 			}
 
 			w.Header().Set("X-Proxy-Cache", "MISS")
-		}
-
-		if backoff := rateLimiter.ShouldBackoff(); backoff > 0 {
-			requestQueue.Enqueue(w, r)
-			return
 		}
 
 		fmt.Printf("[ PROXY SERVER ] Request received at %s at %s\n", r.URL, time.Now().UTC())
@@ -112,6 +107,15 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		limitReset, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Reset"))
 
 		rateLimiter.Update(limitRemain, limitReset)
+
+		// Implement sleep logic based on error limit remaining
+		if limitRemain < 100 {
+			maxSleepTimeInMicroseconds := limitReset * 1000000
+			inverseFactor := float64(100-limitRemain) / 100
+			sleepTimeInMicroseconds := int(inverseFactor * inverseFactor * float64(maxSleepTimeInMicroseconds))
+			sleepTimeInMicroseconds = max(1000, sleepTimeInMicroseconds)
+			time.Sleep(time.Duration(sleepTimeInMicroseconds) * time.Microsecond)
+		}
 
 		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d\n", limitRemain, limitReset)
 	}
