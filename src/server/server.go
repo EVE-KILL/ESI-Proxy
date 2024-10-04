@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/eve-kill/esi-proxy/endpoints"
 	"github.com/eve-kill/esi-proxy/helpers"
@@ -15,7 +16,7 @@ func Test() {
 	log.Println("Starting proxy server")
 }
 
-func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.RequestQueue) {
+func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.RequestQueue, *helpers.Cache) {
 	// Create new router
 	mux := http.NewServeMux()
 
@@ -50,6 +51,9 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 	// Initialize the Request Queue
 	requestQueue := helpers.NewRequestQueue() // Adjust size as needed
 
+	// Initialize the Cache
+	cache := helpers.NewCache(1*time.Hour, 1*time.Hour)
+
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// If the request path is exactly "/", handle it with the root endpoint
 		if r.URL.Path == "/" {
@@ -57,19 +61,23 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 			return
 		}
 		// Otherwise, handle it with the proxy
-		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, requestQueue)(w, r)
+		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache, requestQueue)(w, r)
 	}))
 
-	return mux, proxyHandler, rateLimiter, requestQueue
+	return mux, proxyHandler, rateLimiter, requestQueue, cache
 }
 
 func StartServer() {
-	mux, _, _, requestQueue := setupServer()
+	mux, _, rateLimiter, requestQueue, cache := setupServer()
 
 	// Start processing the request queue
 	go requestQueue.ProcessQueue(func(req helpers.QueuedRequest) {
-		// Implement the logic to process each queued request
-		// This can be similar to the logic in the RequestHandler function
+		// Wait until the rate limiter allows processing
+		for rateLimiter.ShouldBackoff() > 0 {
+			time.Sleep(time.Second)
+		}
+		// Process the request
+		proxy.RequestHandler(proxy.NewProxy(req.Request.URL), req.Request.URL, "/", rateLimiter, cache, requestQueue)(req.ResponseWriter, req.Request)
 	})
 
 	// Dial home
