@@ -68,7 +68,13 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 }
 
 func StartServer() {
-	mux, _, rateLimiter, requestQueue, cache := setupServer()
+	mux, proxyHandler, rateLimiter, requestQueue, cache := setupServer()
+
+	// Retrieve the upstreamURL used in setupServer
+	upstreamURL, err := url.Parse("https://esi.evetech.net/")
+	if err != nil {
+		log.Fatalf("Error parsing upstream URL: %v", err)
+	}
 
 	// Start processing the request queue
 	go requestQueue.ProcessQueue(func(req helpers.QueuedRequest) {
@@ -76,8 +82,8 @@ func StartServer() {
 		for rateLimiter.ShouldBackoff() > 0 {
 			time.Sleep(time.Second)
 		}
-		// Process the request
-		proxy.RequestHandler(proxy.NewProxy(req.Request.URL), req.Request.URL, "/", rateLimiter, cache, requestQueue)(req.ResponseWriter, req.Request)
+		// Process the request using existing proxyHandler and upstreamURL
+		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache, requestQueue)(req.ResponseWriter, req.Request)
 	})
 
 	// Start server
