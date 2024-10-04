@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"os"
@@ -428,7 +429,17 @@ func (ps *ProxyServer) processQueue() {
 		// Process the request
 		go func(req http.Request) {
 			defer ps.semaphore.Release()
-			ps.handleRequest(nil, &req)
+			w := httptest.NewRecorder()
+			ps.handleRequest(w, &req)
+
+			// Write the response to the client
+			resp := w.Result()
+			for k, values := range resp.Header {
+				for _, v := range values {
+					req.Header.Add(k, v)
+				}
+			}
+			resp.Write(w)
 		}(req)
 	}
 }
