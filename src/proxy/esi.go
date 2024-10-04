@@ -43,8 +43,7 @@ func (rc *responseCapture) Write(b []byte) (int, error) {
 
 func (rc *responseCapture) WriteHeader(statusCode int) {
 	rc.status = statusCode
-	rc.headers = rc.ResponseWriter.Header().Clone() // Clone headers to capture them
-	rc.ResponseWriter.WriteHeader(statusCode)
+	rc.headers = rc.ResponseWriter.Header().Clone()
 }
 
 func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string, rateLimiter *helpers.RateLimiter, cache *helpers.Cache, requestQueue *helpers.RequestQueue) func(http.ResponseWriter, *http.Request) {
