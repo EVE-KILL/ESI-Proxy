@@ -22,7 +22,8 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 
 	// Register health and ping endpoints
 	mux.HandleFunc("/ping", endpoints.Ping)
-	mux.HandleFunc("/health", endpoints.Health)
+	mux.HandleFunc("/healthz", endpoints.Healthz) // Liveness probe
+	mux.HandleFunc("/readyz", endpoints.Readyz)   // Readiness probe
 
 	// Set up proxy for all other routes
 	upstreamURL, err := url.Parse("https://esi.evetech.net/")
