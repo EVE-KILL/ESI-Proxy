@@ -70,7 +70,6 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		w.Header().Set("X-PROXY-CACHE", "MISS")
 
 		if backoff := rateLimiter.ShouldBackoff(); backoff > 0 {
-			// Enqueue the request instead of returning an error
 			requestQueue.Enqueue(w, r)
 			return
 		}
@@ -89,6 +88,24 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 
 		rc := &responseCapture{ResponseWriter: w, headers: make(http.Header)}
 		proxy.ServeHTTP(rc, r)
+
+		if rc.status == http.StatusNotModified {
+			// If the upstream server returns 304, check if we have the data cached
+			if cachedResponse, found := cache.Get(cacheKey); found {
+				for key, values := range cachedResponse.Headers {
+					for _, value := range values {
+						w.Header().Add(key, value)
+					}
+				}
+				w.WriteHeader(cachedResponse.Status)
+				w.Write(cachedResponse.Body)
+				return
+			} else {
+				// If no cached data, fetch the data again
+				rc.status = http.StatusOK
+				proxy.ServeHTTP(rc, r)
+			}
+		}
 
 		limitRemain, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Remain"))
 		limitReset, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Reset"))
