@@ -8,16 +8,18 @@ USER root
 # Set workdir
 WORKDIR /app
 
-# Copy the code
+# Copy the source code and templates
 COPY ./src /app
+COPY ./src/templates /app/templates
 
 # Build the application with static linking
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo
 
 FROM library/alpine:latest
 
-# Copy the application from the builder stage
-COPY --from=builder /app/esi-proxy /esi-proxy
+# Copy the application and templates from the builder stage
+COPY --from=builder /app/proxy /proxy
+COPY --from=builder /app/templates /templates
 
 # Set the environment variables
 EXPOSE 9501
