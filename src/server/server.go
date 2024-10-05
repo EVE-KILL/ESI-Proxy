@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"io"
 	"log"
 	"net"
@@ -127,6 +128,13 @@ func StartServer() {
 	host := helpers.GetEnv("HOST", "0.0.0.0")
 	port := helpers.GetEnv("PORT", "8080")
 
+	server := &http.Server{
+		Addr:    host + ":" + port,
+		Handler: mux,
+		// Disable HTTP/2 by setting TLSNextProto to an empty map
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+	}
+
 	log.Println("Proxy server started on http://" + host + ":" + port)
-	log.Fatal(http.ListenAndServe(host+":"+port, mux))
+	log.Fatal(server.ListenAndServe())
 }
