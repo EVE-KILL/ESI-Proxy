@@ -16,7 +16,7 @@ func Test() {
 	log.Println("Starting proxy server")
 }
 
-func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter, *helpers.Cache) {
+func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.Cache) {
 	// Create new router
 	mux := http.NewServeMux()
 
@@ -37,6 +37,11 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 		w.Write([]byte("User-agent: *\nDisallow: /"))
 	})
 
+	// Handle favicon
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	})
+
 	// Set up proxy for all other routes
 	upstreamURL, err := url.Parse("https://esi.evetech.net/")
 	if err != nil {
@@ -44,9 +49,6 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 	}
 
 	proxyHandler := proxy.NewProxy(upstreamURL)
-
-	// Initialize the RateLimiter with default values
-	rateLimiter := helpers.NewRateLimiter()
 
 	// Initialize the Cache
 	cache := helpers.NewCache(1*time.Hour, 1*time.Hour)
@@ -58,14 +60,14 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.RateLimiter
 			return
 		}
 		// Otherwise, handle it with the proxy
-		proxy.RequestHandler(proxyHandler, upstreamURL, "/", rateLimiter, cache)(w, r)
+		proxy.RequestHandler(proxyHandler, upstreamURL, "/", cache)(w, r)
 	}))
 
-	return mux, proxyHandler, rateLimiter, cache
+	return mux, proxyHandler, cache
 }
 
 func StartServer() {
-	mux, _, _, _ := setupServer()
+	mux, _, _ := setupServer()
 
 	// Start server
 	host := helpers.GetEnv("HOST", "0.0.0.0")

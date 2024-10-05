@@ -46,7 +46,7 @@ func (rc *responseCapture) WriteHeader(statusCode int) {
 	rc.headers = rc.ResponseWriter.Header().Clone()
 }
 
-func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string, rateLimiter *helpers.RateLimiter, cache *helpers.Cache) func(http.ResponseWriter, *http.Request) {
+func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string, cache *helpers.Cache) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cacheKey := helpers.GenerateCacheKey(r.URL.String(), r.Header.Get("Authorization"))
 		if r.Method == http.MethodGet {
@@ -126,9 +126,6 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		// Extract rate limiting headers
 		limitRemain, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Remain"))
 		limitReset, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Reset"))
-
-		// Update the rate limiter with the new limits
-		rateLimiter.Update(limitRemain, limitReset)
 
 		// Implement sleep logic based on error limit remaining
 		sleepTimeInMicroseconds := 0
