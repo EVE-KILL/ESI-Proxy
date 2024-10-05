@@ -1,7 +1,9 @@
 package server
 
 import (
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -59,11 +61,53 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.Cache) {
 			endpoints.Root(w, r)
 			return
 		}
+
+		// Handle CONNECT method for tunneling
+		if r.Method == http.MethodConnect {
+			handleConnect(w, r)
+			return
+		}
+
 		// Otherwise, handle it with the proxy
 		proxy.RequestHandler(proxyHandler, upstreamURL, "/", cache)(w, r)
 	}))
 
 	return mux, proxyHandler, cache
+}
+
+// handleConnect handles the CONNECT method for tunneling
+func handleConnect(w http.ResponseWriter, r *http.Request) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return
+	}
+
+	clientConn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer clientConn.Close()
+
+	serverConn, err := net.Dial("tcp", r.Host)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer serverConn.Close()
+
+	clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	go transfer(serverConn, clientConn)
+	go transfer(clientConn, serverConn)
+}
+
+// transfer copies data between two connections
+func transfer(destination net.Conn, source net.Conn) {
+	defer destination.Close()
+	defer source.Close()
+	io.Copy(destination, source)
 }
 
 func StartServer() {
