@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"net/http"
@@ -33,12 +34,11 @@ type responseCapture struct {
 	http.ResponseWriter
 	headers http.Header
 	status  int
-	body    []byte
+	body    bytes.Buffer
 }
 
 func (rc *responseCapture) Write(b []byte) (int, error) {
-	rc.body = append(rc.body, b...)
-	return rc.ResponseWriter.Write(b)
+	return rc.body.Write(b)
 }
 
 func (rc *responseCapture) WriteHeader(statusCode int) {
@@ -51,7 +51,7 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		cacheKey := helpers.GenerateCacheKey(r.URL.String(), r.Header.Get("Authorization"))
 		if r.Method == http.MethodGet {
 			if cachedResponse, found := cache.Get(cacheKey); found {
-				// Always return cached data if it exists
+				// Return cached data if it exists
 				for key, values := range cachedResponse.Headers {
 					for _, value := range values {
 						w.Header().Add(key, value)
@@ -68,6 +68,7 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 
 		fmt.Printf("[ PROXY SERVER ] Request received at %s at %s\n", r.URL, time.Now().UTC())
 
+		// Modify the request to target the upstream server
 		r.URL.Host = url.Host
 		r.URL.Scheme = url.Scheme
 		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
@@ -78,22 +79,27 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 
 		fmt.Printf("[ PROXY SERVER ] Proxying requests to %s at %s\n", r.URL, time.Now().UTC())
 
-		rc := &responseCapture{ResponseWriter: w, headers: make(http.Header)}
+		// Capture the response from the upstream server
+		rc := &responseCapture{ResponseWriter: w, headers: make(http.Header), status: http.StatusOK}
 		proxy.ServeHTTP(rc, r)
 
 		// Convert 304 Not Modified to 200 OK
-		//if rc.status == http.StatusNotModified {
-		//	rc.status = http.StatusOK
-		//}
+		if rc.status == http.StatusNotModified {
+			rc.status = http.StatusOK
+		}
 
-		// Write the status and headers to the response
-		w.WriteHeader(rc.status)
+		// Set the captured headers
 		for key, values := range rc.headers {
 			for _, value := range values {
 				w.Header().Add(key, value)
 			}
 		}
-		w.Write(rc.body)
+
+		// Write the correct status code
+		w.WriteHeader(rc.status)
+
+		// Write the captured body
+		w.Write(rc.body.Bytes())
 
 		// Cache the response if it's a 200 OK and the request method is GET
 		if r.Method == http.MethodGet && rc.status == http.StatusOK {
@@ -109,7 +115,7 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 							cache.Set(cacheKey, helpers.CacheItem{
 								Headers: rc.headers,
 								Status:  rc.status,
-								Body:    rc.body,
+								Body:    rc.body.Bytes(),
 							}, ttl)
 						}
 					}
@@ -117,20 +123,25 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 			}
 		}
 
+		// Extract rate limiting headers
 		limitRemain, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Remain"))
 		limitReset, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Reset"))
 
+		// Update the rate limiter with the new limits
 		rateLimiter.Update(limitRemain, limitReset)
 
 		// Implement sleep logic based on error limit remaining
+		sleepTimeInMicroseconds := 0
 		if limitRemain < 100 {
 			maxSleepTimeInMicroseconds := limitReset * 1000000
 			inverseFactor := float64(100-limitRemain) / 100
-			sleepTimeInMicroseconds := int(inverseFactor * inverseFactor * float64(maxSleepTimeInMicroseconds))
-			sleepTimeInMicroseconds = max(1000, sleepTimeInMicroseconds)
+			sleepTimeInMicroseconds = int(inverseFactor * inverseFactor * float64(maxSleepTimeInMicroseconds))
+			if sleepTimeInMicroseconds < 1000 {
+				sleepTimeInMicroseconds = 1000
+			}
 			time.Sleep(time.Duration(sleepTimeInMicroseconds) * time.Microsecond)
 		}
 
-		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d\n", limitRemain, limitReset)
+		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d, Sleep: %d\n", limitRemain, limitReset, sleepTimeInMicroseconds)
 	}
 }
