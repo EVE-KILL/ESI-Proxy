@@ -139,6 +139,6 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 			time.Sleep(time.Duration(sleepTimeInMicroseconds) * time.Microsecond)
 		}
 
-		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d, Sleep: %d\n", limitRemain, limitReset, sleepTimeInMicroseconds)
+		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d, Sleep: %d ms\n", limitRemain, limitReset, sleepTimeInMicroseconds*1000)
 	}
 }
