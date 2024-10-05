@@ -128,17 +128,17 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		limitReset, _ := strconv.Atoi(rc.headers.Get("X-Esi-Error-Limit-Reset"))
 
 		// Implement sleep logic based on error limit remaining
-		sleepTimeInMicroseconds := 0
+		sleepTimeInMilliseconds := 0
 		if limitRemain < 100 {
-			maxSleepTimeInMicroseconds := limitReset * 1000000
+			maxSleepTimeInMilliseconds := limitReset * 1000 // Convert reset time to milliseconds
 			inverseFactor := float64(100-limitRemain) / 100
-			sleepTimeInMicroseconds = int(inverseFactor * inverseFactor * float64(maxSleepTimeInMicroseconds))
-			if sleepTimeInMicroseconds < 1000 {
-				sleepTimeInMicroseconds = 1000
+			sleepTimeInMilliseconds = int(inverseFactor * inverseFactor * float64(maxSleepTimeInMilliseconds))
+			if sleepTimeInMilliseconds < 1 {
+				sleepTimeInMilliseconds = 1
 			}
-			time.Sleep(time.Duration(sleepTimeInMicroseconds) * time.Microsecond)
+			time.Sleep(time.Duration(sleepTimeInMilliseconds) * time.Millisecond)
 		}
 
-		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d, Sleep: %d ms\n", limitRemain, limitReset, sleepTimeInMicroseconds*1000)
+		fmt.Printf("X-Esi-Error-Limit-Remain: %d, X-Esi-Error-Limit-Reset: %d, Sleep: %d ms\n", limitRemain, limitReset, sleepTimeInMilliseconds)
 	}
 }
