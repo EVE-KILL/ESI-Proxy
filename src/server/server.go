@@ -1,14 +1,10 @@
 package server
 
 import (
-	"crypto/tls"
-	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/eve-kill/esi-proxy/endpoints"
@@ -63,62 +59,11 @@ func setupServer() (*http.ServeMux, *httputil.ReverseProxy, *helpers.Cache) {
 			endpoints.Root(w, r)
 			return
 		}
-
-		// Handle CONNECT method for tunneling
-		if r.Method == http.MethodConnect {
-			handleConnect(w, r)
-			return
-		}
-
 		// Otherwise, handle it with the proxy
 		proxy.RequestHandler(proxyHandler, upstreamURL, "/", cache)(w, r)
 	}))
 
 	return mux, proxyHandler, cache
-}
-
-// handleConnect handles the CONNECT method for tunneling
-func handleConnect(w http.ResponseWriter, r *http.Request) {
-	hijacker, ok := w.(http.Hijacker)
-	if !ok {
-		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
-		return
-	}
-
-	clientConn, _, err := hijacker.Hijack()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-	defer clientConn.Close()
-
-	// Extract the host and port from the request
-	host := r.Host
-	if !strings.Contains(host, ":") {
-		host += ":443" // Default to port 443 for HTTPS
-	}
-
-	serverConn, err := net.Dial("tcp", host)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-	defer serverConn.Close()
-
-	// Send a 200 Connection Established response to the client
-	clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-
-	log.Println("Connection established")
-
-	go transfer(serverConn, clientConn)
-	go transfer(clientConn, serverConn)
-}
-
-// transfer copies data between two connections
-func transfer(destination net.Conn, source net.Conn) {
-	defer destination.Close()
-	defer source.Close()
-	io.Copy(destination, source)
 }
 
 func StartServer() {
@@ -128,13 +73,6 @@ func StartServer() {
 	host := helpers.GetEnv("HOST", "0.0.0.0")
 	port := helpers.GetEnv("PORT", "8080")
 
-	server := &http.Server{
-		Addr:    host + ":" + port,
-		Handler: mux,
-		// Disable HTTP/2 by setting TLSNextProto to an empty map
-		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
-	}
-
 	log.Println("Proxy server started on http://" + host + ":" + port)
-	log.Fatal(server.ListenAndServe())
+	log.Fatal(http.ListenAndServe(host+":"+port, mux))
 }
