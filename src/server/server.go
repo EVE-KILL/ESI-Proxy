@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/eve-kill/esi-proxy/endpoints"
@@ -90,14 +91,23 @@ func handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	defer clientConn.Close()
 
-	serverConn, err := net.Dial("tcp", r.Host)
+	// Extract the host and port from the request
+	host := r.Host
+	if !strings.Contains(host, ":") {
+		host += ":443" // Default to port 443 for HTTPS
+	}
+
+	serverConn, err := net.Dial("tcp", host)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 	defer serverConn.Close()
 
+	// Send a 200 Connection Established response to the client
 	clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	log.Println("Connection established")
 
 	go transfer(serverConn, clientConn)
 	go transfer(clientConn, serverConn)
