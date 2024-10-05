@@ -54,7 +54,7 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 				// Return cached data if it exists
 				for key, values := range cachedResponse.Headers {
 					for _, value := range values {
-						w.Header().Add(key, value)
+						w.Header().Set(key, value)
 					}
 				}
 				w.Header().Set("X-Proxy-Cache", "HIT")
@@ -91,7 +91,7 @@ func RequestHandler(proxy *httputil.ReverseProxy, url *url.URL, endpoint string,
 		// Set the captured headers
 		for key, values := range rc.headers {
 			for _, value := range values {
-				w.Header().Add(key, value)
+				w.Header().Set(key, value)
 			}
 		}
 
