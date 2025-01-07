@@ -33,6 +33,21 @@ serve({
       // Fetch from ESI
       const upstreamResp = await fetch(targetUrl, reqInit);
 
+      // Handle redirects to keep them on our proxy
+      if (upstreamResp.status >= 300 && upstreamResp.status < 400) {
+        const location = upstreamResp.headers.get('location');
+        if (location) {
+          // If location is absolute URL to ESI, rewrite it to use our host
+          const locationUrl = new URL(location, 'https://esi.evetech.net');
+          if (locationUrl.hostname === 'esi.evetech.net') {
+            const proxyUrl = new URL(request.url);
+            locationUrl.protocol = proxyUrl.protocol;
+            locationUrl.host = proxyUrl.host;
+          }
+          respHeaders.set('location', locationUrl.toString());
+        }
+      }
+
       // Compute duration
       const duration = Date.now() - startTime;
 
