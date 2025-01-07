@@ -43,6 +43,7 @@ app.all('*', async (req: Request, res: Response) => {
             res.end();
         }
     } catch (error) {
+        console.error(error);
         res.status(500).send('Proxy error occurred');
     }
 });
