@@ -1,8 +1,7 @@
 import express, { Request, Response } from 'express';
-import fetch from 'node-fetch';
 
 const app = express();
-const port = process.env.PORT || 3006;
+const port = parseInt(process.env.PORT || '3006', 10);
 const host = process.env.HOST || '0.0.0.0';
 
 app.use((req: Request, res: Response, next) => {
@@ -23,17 +22,14 @@ app.get('/health', (req: Request, res: Response) => {
 
 app.all('*', async (req: Request, res: Response) => {
     const targetUrl = `https://esi.evetech.net${req.url}`;
-    const headers: Record<string, string> = {};
-    for (const [key, value] of Object.entries(req.headers)) {
-        if (key.toLowerCase() === 'host') continue;
-        headers[key] = Array.isArray(value) ? value.join(';') : value || '';
-    }
-
     const requestInit: RequestInit = {
         method: req.method,
-        headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
+        headers: req.headers as Record<string, string>,
     };
+
+    if (!['GET', 'HEAD'].includes(req.method)) {
+        requestInit.body = req.body;
+    }
 
     try {
         const response = await fetch(targetUrl, requestInit);
@@ -41,8 +37,6 @@ app.all('*', async (req: Request, res: Response) => {
         response.headers.forEach((value, key) => {
             res.setHeader(key, value);
         });
-        res.setHeader('X-Powered-By', 'ESI-PROXY');
-
         if (response.body) {
             response.body.pipe(res);
         } else {
