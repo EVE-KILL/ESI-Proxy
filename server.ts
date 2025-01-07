@@ -38,7 +38,7 @@ app.all('*', async (req: Request, res: Response) => {
             res.setHeader(key, value);
         });
         if (response.body) {
-            response.body.pipe(res);
+            res.send(response);
         } else {
             res.end();
         }
