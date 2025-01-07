@@ -2,8 +2,8 @@ import express, { Request, Response } from 'express';
 import fetch from 'node-fetch';
 
 const app = express();
-const port = process.env.PORT || 3005;
-const host = process.env.HOST || '127.0.0.1';
+const port = process.env.PORT || 3006;
+const host = process.env.HOST || '0.0.0.0';
 
 app.get('/health', (req: Request, res: Response) => {
     res.send('OK');
