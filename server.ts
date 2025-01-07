@@ -42,8 +42,7 @@ app.all('*', async (req: Request, res: Response) => {
     });
     res.setHeader('X-Powered-By', 'ESI-PROXY');
 
-    const responseBuffer = Buffer.from(await response.arrayBuffer());
-    res.send(responseBuffer);
+    response.body.pipe(res);
 });
 
 app.listen(port, host, () => {
