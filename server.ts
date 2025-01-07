@@ -2,7 +2,9 @@ import { serve } from 'bun';
 
 serve({
   port: parseInt(process.env.PORT || '3006', 10),
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, server): Promise<Response> {
+    const startTime = Date.now();
+
     try {
       const originalUrl = new URL(request.url);
       const targetUrl = 'https://esi.evetech.net' + originalUrl.pathname + originalUrl.search;
@@ -15,6 +17,7 @@ serve({
       const reqInit: RequestInit = {
         method: request.method,
         headers: reqHeaders,
+        verbose: true
       };
       if (!['GET', 'HEAD'].includes(request.method)) {
         reqInit.body = request.body;
@@ -22,6 +25,20 @@ serve({
 
       // Fetch from ESI
       const upstreamResp = await fetch(targetUrl, reqInit);
+
+      // Compute duration
+      const duration = Date.now() - startTime;
+
+      // In Bun, server?.remoteAddress contains the IP address
+      const ip = server?.remoteAddress || '-';
+      const method = request.method;
+      const urlPath = request.url;
+      const status = upstreamResp.status;
+      const contentLength = upstreamResp.headers.get('content-length') || 0;
+      const userAgent = request.headers.get('user-agent') || '-';
+
+      // Log in NGINX-like format
+      console.log(`${ip} - - [${new Date().toISOString()}] "${method} ${urlPath}" ${status} ${contentLength} "${userAgent}" ${duration}ms`);
 
       // Clone upstream response headers, removing potentially problematic ones
       const respHeaders = new Headers(upstreamResp.headers);
