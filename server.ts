@@ -24,24 +24,25 @@ app.all('*', async (req: Request, res: Response) => {
     const targetUrl = `https://esi.evetech.net${req.url}`;
     const requestInit: RequestInit = {
         method: req.method,
-        headers: req.headers as Record<string, string>,
+        headers: Object.fromEntries(
+            Object.entries(req.headers).filter(([key]) => key !== 'host')
+        ) as Record<string, string>,
+        body: !['GET', 'HEAD'].includes(req.method) ? req.body : undefined
     };
-
-    if (!['GET', 'HEAD'].includes(req.method)) {
-        requestInit.body = req.body;
-    }
 
     try {
         const response = await fetch(targetUrl, requestInit);
+
+        // Copy status and headers
         res.status(response.status);
         response.headers.forEach((value, key) => {
             res.setHeader(key, value);
         });
-        if (response.body) {
-            res.send(response);
-        } else {
-            res.end();
-        }
+
+        // Stream the response using Bun's blob() method
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        res.send(Buffer.from(arrayBuffer));
     } catch (error) {
         console.error(error);
         res.status(500).send('Proxy error occurred');
