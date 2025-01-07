@@ -43,6 +43,7 @@ app.all('*', async (req: Request, res: Response) => {
     const fetchOptions: RequestInit = {
       method: req.method,
       headers: requestHeaders,
+      verbose: true,
     };
 
     // Forward request body if it's not GET/HEAD
