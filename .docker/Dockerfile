@@ -1,28 +1,16 @@
-FROM library/golang:latest AS builder
+FROM oven/bun:latest
 
 LABEL org.opencontainers.image.source="https://github.com/EVE-KILL/ESI-Proxy"
-
-# Run as root
-USER root
 
 # Set workdir
 WORKDIR /app
 
 # Copy the source code and templates
-COPY ./src /app
-COPY ./src/templates /app/templates
+COPY . /app
 
-# Build the application with static linking
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo
+RUN \
+    bun install --production
 
-FROM library/alpine:latest
+EXPOSE 3006
 
-# Copy the application and templates from the builder stage
-COPY --from=builder /app/esi-proxy /esi-proxy
-COPY --from=builder /app/templates /templates
-
-# Set the environment variables
-EXPOSE 9501
-ENV PORT=9501
-ENV HOST=0.0.0.0
-CMD ["/esi-proxy"]
+CMD [ "bun", "--bun", "run", "/app/server.ts" ]

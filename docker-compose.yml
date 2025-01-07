@@ -4,7 +4,7 @@ services:
   esi-proxy:
     image: ghcr.io/eve-kill/esi-proxy:latest
     ports:
-      - "9501:9501"
+      - "3006:3006"
     networks:
       - proxy
 
