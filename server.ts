@@ -71,6 +71,23 @@ serve({
       // Force keep-alive
       respHeaders.set('Connection', 'keep-alive');
 
+      // Special handling for UI content
+      if (url.pathname.startsWith('/ui/')) {
+        const contentType = upstreamResp.headers.get('content-type') || '';
+
+        if (contentType.includes('text/html') || contentType.includes('application/javascript') || contentType.includes('text/css')) {
+          // Get the content and replace any absolute ESI URLs with our proxy URL
+          const text = await upstreamResp.text();
+          const proxyHost = new URL(request.url).host;
+          const modified = text.replace(/https:\/\/esi\.evetech\.net/g, `https://${proxyHost}`);
+
+          return new Response(modified, {
+            status: upstreamResp.status,
+            headers: respHeaders
+          });
+        }
+      }
+
       // Return new Response with the upstream body and cleaned-up headers
       return new Response(upstreamResp.body, {
         status: upstreamResp.status,
