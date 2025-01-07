@@ -5,6 +5,18 @@ const app = express();
 const port = process.env.PORT || 3006;
 const host = process.env.HOST || '0.0.0.0';
 
+app.use((req: Request, res: Response, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        const logMessage = `${req.ip} - - [${new Date().toISOString()}] "${req.method} ${req.originalUrl} HTTP/${req.httpVersion}" ${res.statusCode} ${res.get('Content-Length') || 0} "${req.headers['referer'] || '-'}" "${req.headers['user-agent'] || '-'}" ${duration}ms`;
+        console.log(logMessage);
+    });
+    next();
+});
+
+app.use(express.raw({ type: '*/*' }));
+
 app.get('/health', (req: Request, res: Response) => {
     res.send('OK');
 });
