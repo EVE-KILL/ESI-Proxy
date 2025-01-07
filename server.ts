@@ -33,28 +33,6 @@ serve({
       // Fetch from ESI
       const upstreamResp = await fetch(targetUrl, reqInit);
 
-      // Initialize response headers first
-      const respHeaders = new Headers(upstreamResp.headers);
-      respHeaders.delete('content-encoding');
-      respHeaders.delete('content-length');
-      respHeaders.delete('transfer-encoding');
-      respHeaders.set('Connection', 'keep-alive');
-
-      // Handle redirects to keep them on our proxy
-      if (upstreamResp.status >= 300 && upstreamResp.status < 400) {
-        const location = upstreamResp.headers.get('location');
-        if (location) {
-          // If location is absolute URL to ESI, rewrite it to use our host
-          const locationUrl = new URL(location, 'https://esi.evetech.net');
-          if (locationUrl.hostname === 'esi.evetech.net') {
-            const proxyUrl = new URL(request.url);
-            locationUrl.protocol = proxyUrl.protocol;
-            locationUrl.host = proxyUrl.host;
-            respHeaders.set('location', locationUrl.toString());
-          }
-        }
-      }
-
       // Compute duration
       const duration = Date.now() - startTime;
 
@@ -69,22 +47,14 @@ serve({
       // Log in NGINX-like format
       console.log(`${ip} - - [${new Date().toISOString()}] "${method} ${urlPath}" ${status} ${contentLength} "${userAgent}" ${duration}ms`);
 
-      // Special handling for UI content
-      if (url.pathname.startsWith('/ui/')) {
-        const contentType = upstreamResp.headers.get('content-type') || '';
+      // Clone upstream response headers, removing potentially problematic ones
+      const respHeaders = new Headers(upstreamResp.headers);
+      respHeaders.delete('content-encoding');
+      respHeaders.delete('content-length');
+      respHeaders.delete('transfer-encoding');
 
-        if (contentType.includes('text/html') || contentType.includes('application/javascript') || contentType.includes('text/css')) {
-          // Get the content and replace any absolute ESI URLs with our proxy URL
-          const text = await upstreamResp.text();
-          const proxyHost = new URL(request.url).host;
-          const modified = text.replace(/https:\/\/esi\.evetech\.net/g, `https://${proxyHost}`);
-
-          return new Response(modified, {
-            status: upstreamResp.status,
-            headers: respHeaders
-          });
-        }
-      }
+      // Force keep-alive
+      respHeaders.set('Connection', 'keep-alive');
 
       // Return new Response with the upstream body and cleaned-up headers
       return new Response(upstreamResp.body, {
