@@ -33,6 +33,13 @@ serve({
       // Fetch from ESI
       const upstreamResp = await fetch(targetUrl, reqInit);
 
+      // Initialize response headers first
+      const respHeaders = new Headers(upstreamResp.headers);
+      respHeaders.delete('content-encoding');
+      respHeaders.delete('content-length');
+      respHeaders.delete('transfer-encoding');
+      respHeaders.set('Connection', 'keep-alive');
+
       // Handle redirects to keep them on our proxy
       if (upstreamResp.status >= 300 && upstreamResp.status < 400) {
         const location = upstreamResp.headers.get('location');
@@ -43,8 +50,8 @@ serve({
             const proxyUrl = new URL(request.url);
             locationUrl.protocol = proxyUrl.protocol;
             locationUrl.host = proxyUrl.host;
+            respHeaders.set('location', locationUrl.toString());
           }
-          respHeaders.set('location', locationUrl.toString());
         }
       }
 
@@ -61,15 +68,6 @@ serve({
 
       // Log in NGINX-like format
       console.log(`${ip} - - [${new Date().toISOString()}] "${method} ${urlPath}" ${status} ${contentLength} "${userAgent}" ${duration}ms`);
-
-      // Clone upstream response headers, removing potentially problematic ones
-      const respHeaders = new Headers(upstreamResp.headers);
-      respHeaders.delete('content-encoding');
-      respHeaders.delete('content-length');
-      respHeaders.delete('transfer-encoding');
-
-      // Force keep-alive
-      respHeaders.set('Connection', 'keep-alive');
 
       // Special handling for UI content
       if (url.pathname.startsWith('/ui/')) {
