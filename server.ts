@@ -35,14 +35,22 @@ app.all('*', async (req: Request, res: Response) => {
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
     };
 
-    const response = await fetch(targetUrl, requestInit);
-    res.status(response.status);
-    response.headers.forEach((value, key) => {
-        res.setHeader(key, value);
-    });
-    res.setHeader('X-Powered-By', 'ESI-PROXY');
+    try {
+        const response = await fetch(targetUrl, requestInit);
+        res.status(response.status);
+        response.headers.forEach((value, key) => {
+            res.setHeader(key, value);
+        });
+        res.setHeader('X-Powered-By', 'ESI-PROXY');
 
-    response.body.pipe(res);
+        if (response.body) {
+            response.body.pipe(res);
+        } else {
+            res.end();
+        }
+    } catch (error) {
+        res.status(500).send('Proxy error occurred');
+    }
 });
 
 app.listen(port, host, () => {
