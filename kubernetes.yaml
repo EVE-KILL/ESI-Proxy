@@ -24,7 +24,7 @@ spec:
         image: ghcr.io/eve-kill/esi-proxy:latest
         imagePullPolicy: Always
         ports:
-        - containerPort: 9501
+        - containerPort: 6000
         resources:
           requests:
             memory: "256Mi"
@@ -35,13 +35,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 9501
+            port: 6000
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 9501
+            port: 6000
           initialDelaySeconds: 30
           periodSeconds: 10
       terminationGracePeriodSeconds: 30
@@ -61,8 +61,8 @@ spec:
     app: esi-proxy
   ports:
     - protocol: TCP
-      port: 9501
-      targetPort: 9501
+      port: 6000
+      targetPort: 6000
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -100,7 +100,7 @@ spec:
           service:
             name: esi-proxy
             port:
-              number: 9501
+              number: 6000
   tls:
   - hosts:
     - your.domain.com
