@@ -6,8 +6,22 @@ serve({
     const startTime = Date.now();
 
     try {
-      const originalUrl = new URL(request.url);
-      const targetUrl = 'https://esi.evetech.net' + originalUrl.pathname + originalUrl.search;
+      const url = new URL(request.url);
+
+      // Handle special routes
+      if (url.pathname === '/health') {
+        return new Response('OK', { status: 200 });
+      }
+
+      if (url.pathname === '/') {
+        return new Response(null, {
+          status: 301,
+          headers: { Location: '/ui' }
+        });
+      }
+
+      // Proxy to ESI
+      const targetUrl = `https://esi.evetech.net${url.pathname}${url.search}`;
 
       // Clone and adjust request headers
       const reqHeaders = new Headers(request.headers);
@@ -16,8 +30,7 @@ serve({
       // Prepare request init, injecting method/headers/body
       const reqInit: RequestInit = {
         method: request.method,
-        headers: reqHeaders,
-        verbose: true
+        headers: reqHeaders
       };
       if (!['GET', 'HEAD'].includes(request.method)) {
         reqInit.body = request.body;
