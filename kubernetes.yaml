@@ -34,15 +34,15 @@ spec:
             cpu: "1"
         livenessProbe:
           httpGet:
-            path: /healthz
+            path: /health
             port: 3006
-          initialDelaySeconds: 30
+          initialDelaySeconds: 5
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /readyz
+            path: /health
             port: 3006
-          initialDelaySeconds: 30
+          initialDelaySeconds: 5
           periodSeconds: 10
       terminationGracePeriodSeconds: 30
   strategy:

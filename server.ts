@@ -5,6 +5,10 @@ const app = express();
 const port = process.env.PORT || 3005;
 const host = process.env.HOST || '127.0.0.1';
 
+app.get('/health', (req: Request, res: Response) => {
+    res.send('OK');
+});
+
 app.all('*', async (req: Request, res: Response) => {
     const targetUrl = `https://esi.evetech.net${req.url}`;
     const headers: Record<string, string> = {};
