@@ -24,7 +24,7 @@ spec:
         image: ghcr.io/eve-kill/esi-proxy:latest
         imagePullPolicy: Always
         ports:
-        - containerPort: 6000
+        - containerPort: 3006
         resources:
           requests:
             memory: "256Mi"
@@ -35,13 +35,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 6000
+            port: 3006
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 6000
+            port: 3006
           initialDelaySeconds: 30
           periodSeconds: 10
       terminationGracePeriodSeconds: 30
@@ -61,8 +61,8 @@ spec:
     app: esi-proxy
   ports:
     - protocol: TCP
-      port: 6000
-      targetPort: 6000
+      port: 3006
+      targetPort: 3006
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -100,7 +100,7 @@ spec:
           service:
             name: esi-proxy
             port:
-              number: 6000
+              number: 3006
   tls:
   - hosts:
     - your.domain.com
