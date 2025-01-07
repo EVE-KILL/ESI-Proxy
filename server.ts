@@ -22,7 +22,7 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 app.all('*', async (req: Request, res: Response) => {
-    const targetUrl = `https://esi.evetech.net${req.url}`;
+    const targetUrl = `https://esi.evetech.net${req.url}${req.url.includes('?') ? '&' : '?'}datasource=tranquility`;
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.headers)) {
         if (key.toLowerCase() === 'host') continue;
