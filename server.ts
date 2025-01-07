@@ -13,13 +13,6 @@ serve({
         return new Response('OK', { status: 200 });
       }
 
-      if (url.pathname === '/') {
-        return new Response(null, {
-          status: 301,
-          headers: { Location: '/ui' }
-        });
-      }
-
       // Proxy to ESI
       const targetUrl = `https://esi.evetech.net${url.pathname}${url.search}`;
 
@@ -30,7 +23,8 @@ serve({
       // Prepare request init, injecting method/headers/body
       const reqInit: RequestInit = {
         method: request.method,
-        headers: reqHeaders
+        headers: reqHeaders,
+        redirect: 'manual'
       };
       if (!['GET', 'HEAD'].includes(request.method)) {
         reqInit.body = request.body;
