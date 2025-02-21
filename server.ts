@@ -18,7 +18,12 @@ serve({
 
       // Clone and adjust request headers
       const reqHeaders = new Headers(request.headers);
+      console.log('Incoming Authorization:', request.headers.get('Authorization')); // Debug line
       reqHeaders.delete('host');
+
+      // Ensure Authorization header is explicitly set
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader) { reqHeaders.set('Authorization', authHeader); }
 
       // Prepare request init, injecting method/headers/body
       const reqInit: RequestInit = {
